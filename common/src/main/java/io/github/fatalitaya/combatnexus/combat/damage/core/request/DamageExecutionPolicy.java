@@ -4,6 +4,7 @@ import io.github.fatalitaya.combatnexus.combat.api.transaction.CombatLineage;
 import io.github.fatalitaya.combatnexus.combat.damage.api.damage.*;
 import io.github.fatalitaya.combatnexus.api.id.NexusId;
 import java.util.HashSet;
+import org.jetbrains.annotations.Nullable;
 
 /** Damage trigger restrictions survive healing/shield hops in the common causal lineage. */
 public final class DamageExecutionPolicy {
@@ -25,6 +26,41 @@ public final class DamageExecutionPolicy {
         return result;
     }
     public static DamageFailureReason failure(CombatLineage lineage, DamageRequestKind kind) {
-        return DamageAdmissionController.triggerFailure(kind, inherited(lineage));
+        return triggerFailure(kind, inherited(lineage));
     }
+    public static @Nullable DamageFailureReason triggerFailure(
+            DamageRequestKind kind,
+            @Nullable DamageTriggerPolicy parentPolicy
+    ) {
+        if (parentPolicy == null) {
+            return null;
+        }
+        return switch (kind) {
+            case PROC -> parentPolicy.procAllowed()
+                    ? null
+                    : DamageFailureReason.PROC_SUPPRESSED;
+            case REFLECTED -> parentPolicy.reflectionAllowed()
+                    ? null
+                    : DamageFailureReason.REFLECTION_SUPPRESSED;
+            case THORNS -> parentPolicy.thornsAllowed()
+                    ? null
+                    : DamageFailureReason.THORNS_SUPPRESSED;
+            case PRIMARY, SWEEP, DOT, ENVIRONMENTAL, CUSTOM -> null;
+        };
+    }
+
+    public static @Nullable DamageFailureReason depthFailure(
+            int depth,
+            int maximum
+    ) {
+        if (depth < 0 || maximum < 1) {
+            throw new IllegalArgumentException(
+                    "Depth must be non-negative and maximum must be positive"
+            );
+        }
+        return depth > maximum
+                ? DamageFailureReason.MAX_RECURSION_DEPTH
+                : null;
+    }
+
 }

@@ -17,6 +17,6 @@ public final class ProjectileDamageRuleProvider implements DamageRuleProvider {
         if(launch.isEmpty()||launch.get().weapon().isEmpty())return;
         var weapon=launch.get().weapon();var owner=ctx.equipmentOwner();
         var execution=RuleExecutionContext.projectileSource(DamageRuleRole.OFFENSIVE,owner==null?null:owner.getId(),weapon.itemId(),profile.directAttackerId());
-        StackEntryCollector.collectStackEntries(ctx,phase,out,weapon,execution,"captured_projectile_damage");
+        StackEntryCollector.collectStackEntries(ctx.definitions(),phase,out,weapon,execution,"captured_projectile_damage");
     }
 }

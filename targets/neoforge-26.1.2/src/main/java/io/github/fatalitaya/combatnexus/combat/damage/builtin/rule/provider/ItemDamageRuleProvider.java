@@ -141,7 +141,7 @@ public final class ItemDamageRuleProvider implements DamageRuleProvider {
                             source.category()
                     );
             StackEntryCollector.collectStackEntries(
-                    ctx,
+                    ctx.definitions(),
                     phase,
                     out,
                     io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().ruleItem(source.stack()),
@@ -255,7 +255,7 @@ public final class ItemDamageRuleProvider implements DamageRuleProvider {
                         io.github.fatalitaya.combatnexus.api.equipment.EquipmentPosition.valueOf(slot.name())
                 );
 
-        StackEntryCollector.collectStackEntries(ctx, phase, out, stack, exec,
+        StackEntryCollector.collectStackEntries(ctx.definitions(), phase, out, stack, exec,
                 "item_damage_entries/" + exec.sourceLocation().name().toLowerCase());
     }
 
@@ -267,7 +267,7 @@ public final class ItemDamageRuleProvider implements DamageRuleProvider {
             RuleExecutionContext exec
     ) {
         StackEntryCollector.collectStackEntries(
-                ctx,
+                ctx.definitions(),
                 phase,
                 out,
                 io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().ruleItem(stack),

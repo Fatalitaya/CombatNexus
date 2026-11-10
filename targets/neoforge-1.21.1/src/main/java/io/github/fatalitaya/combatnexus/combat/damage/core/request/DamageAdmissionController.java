@@ -25,7 +25,7 @@ public final class DamageAdmissionController {
         Objects.requireNonNull(server, "server");
         CombatSafetySettings settings = definitions.settings().safety();
 
-        DamageFailureReason depthFailure = depthFailure(
+        DamageFailureReason depthFailure = DamageExecutionPolicy.depthFailure(
                 origin.lineage().recursionDepth(),
                 settings.maxRecursionDepth()
         );
@@ -41,41 +41,6 @@ public final class DamageAdmissionController {
         if (kernel.hasTicket(origin.lineage().transaction()))
             return DamageAdmissionResult.admitted(origin.lineage().derivedRequestCountInternal(), kernel.currentTickCount());
         throw new IllegalStateException("Native damage requires admission before entering hurtServer");
-    }
-
-    static @Nullable DamageFailureReason triggerFailure(
-            DamageRequestKind kind,
-            @Nullable DamageTriggerPolicy parentPolicy
-    ) {
-        if (parentPolicy == null) {
-            return null;
-        }
-        return switch (kind) {
-            case PROC -> parentPolicy.procAllowed()
-                    ? null
-                    : DamageFailureReason.PROC_SUPPRESSED;
-            case REFLECTED -> parentPolicy.reflectionAllowed()
-                    ? null
-                    : DamageFailureReason.REFLECTION_SUPPRESSED;
-            case THORNS -> parentPolicy.thornsAllowed()
-                    ? null
-                    : DamageFailureReason.THORNS_SUPPRESSED;
-            case PRIMARY, SWEEP, DOT, ENVIRONMENTAL, CUSTOM -> null;
-        };
-    }
-
-    static @Nullable DamageFailureReason depthFailure(
-            int depth,
-            int maximum
-    ) {
-        if (depth < 0 || maximum < 1) {
-            throw new IllegalArgumentException(
-                    "Depth must be non-negative and maximum must be positive"
-            );
-        }
-        return depth > maximum
-                ? DamageFailureReason.MAX_RECURSION_DEPTH
-                : null;
     }
 
     public static void clearServer(CombatServerRuntime server) {

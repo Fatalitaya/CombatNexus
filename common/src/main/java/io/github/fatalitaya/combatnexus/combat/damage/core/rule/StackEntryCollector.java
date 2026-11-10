@@ -8,7 +8,7 @@ import io.github.fatalitaya.combatnexus.combat.api.affix.AffixDefinition;
 import io.github.fatalitaya.combatnexus.combat.api.affix.RuntimeAffix;
 import io.github.fatalitaya.combatnexus.combat.api.entry.EntryDefinition;
 import io.github.fatalitaya.combatnexus.combat.api.entry.RuntimeEntry;
-import io.github.fatalitaya.combatnexus.combat.damage.core.pipeline.DamageFrozenFacts;
+import io.github.fatalitaya.combatnexus.combat.internal.definition.DefinitionGeneration;
 import io.github.fatalitaya.combatnexus.combat.damage.core.security.DamageModuleItemSecurity;
 import io.github.fatalitaya.combatnexus.combat.damage.api.item.RuleItemView;
 
@@ -19,7 +19,7 @@ public final class StackEntryCollector {
     }
 
     public static void collectStackEntries(
-            DamageFrozenFacts ctx,
+            DefinitionGeneration definitions,
             DamagePhase phase,
             List<RuntimeDamageRule> out,
             RuleItemView stack,
@@ -27,12 +27,12 @@ public final class StackEntryCollector {
             String source
     ) {
         collectStackEntries(
-                ctx, phase, out, stack, exec, source, true, true
+                definitions, phase, out, stack, exec, source, true, true
         );
     }
 
     public static void collectStackEntries(
-            DamageFrozenFacts ctx,
+            DefinitionGeneration definitions,
             DamagePhase phase,
             List<RuntimeDamageRule> out,
             RuleItemView stack,
@@ -49,7 +49,7 @@ public final class StackEntryCollector {
                 DamageModuleItemSecurity.validateForExecution(
                         stack,
                         source,
-                        ctx.definitions()
+                        definitions
                 );
 
         if (validated.isEmpty()) {
@@ -58,34 +58,28 @@ public final class StackEntryCollector {
 
         if (readEntries) {
             collectEntryRules(
-                    ctx,
                     phase,
                     out,
                     validated.entries(),
-                    exec,
-                    source
+                    exec
             );
         }
 
         if (readAffixes) {
             collectAffixRules(
-                    ctx,
                     phase,
                     out,
                     validated.affixes(),
-                    exec,
-                    source
+                    exec
             );
         }
     }
 
     private static void collectEntryRules(
-            DamageFrozenFacts ctx,
             DamagePhase phase,
             List<RuntimeDamageRule> out,
             List<EntryDefinition> entries,
-            RuleExecutionContext exec,
-            String source
+            RuleExecutionContext exec
     ) {
         if (entries.isEmpty()) {
             return;
@@ -112,12 +106,10 @@ public final class StackEntryCollector {
     }
 
     private static void collectAffixRules(
-            DamageFrozenFacts ctx,
             DamagePhase phase,
             List<RuntimeDamageRule> out,
             List<AffixDefinition> affixes,
-            RuleExecutionContext exec,
-            String source
+            RuleExecutionContext exec
     ) {
         if (affixes.isEmpty()) {
             return;
