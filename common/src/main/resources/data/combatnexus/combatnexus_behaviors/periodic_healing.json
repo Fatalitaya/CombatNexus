@@ -1,0 +1,14 @@
+{
+  "priority": 0,
+  "components": [
+    {
+      "type": "combatnexus:periodic_healing",
+      "amount": 1,
+      "interval_ticks": 20
+    }
+  ],
+  "lifetime": {
+    "kind": "TIMED",
+    "ticks": 200
+  }
+}

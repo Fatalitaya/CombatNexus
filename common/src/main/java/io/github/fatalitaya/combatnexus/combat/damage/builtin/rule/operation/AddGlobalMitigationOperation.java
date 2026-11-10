@@ -1,0 +1,49 @@
+package io.github.fatalitaya.combatnexus.combat.damage.builtin.rule.operation;
+
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import io.github.fatalitaya.combatnexus.combat.damage.api.context.DamageMutationResult;
+import io.github.fatalitaya.combatnexus.combat.damage.api.context.DamageRuleContext;
+import io.github.fatalitaya.combatnexus.combat.damage.api.enums.DamagePhase;
+import io.github.fatalitaya.combatnexus.combat.damage.api.rule.DamageRuleOperation;
+import io.github.fatalitaya.combatnexus.combat.damage.api.rule.RuleTraceIds;
+import io.github.fatalitaya.combatnexus.combat.damage.api.rule.DamageModuleOperationIds;
+import io.github.fatalitaya.combatnexus.api.id.NexusId;
+
+import java.util.Set;
+
+public record AddGlobalMitigationOperation(
+        float value
+) implements DamageRuleOperation {
+
+    public static final MapCodec<AddGlobalMitigationOperation> CODEC =
+            RecordCodecBuilder.mapCodec(instance -> instance.group(
+                    Codec.FLOAT
+                            .fieldOf("value")
+                            .forGetter(AddGlobalMitigationOperation::value)
+            ).apply(instance, AddGlobalMitigationOperation::new));
+
+    @Override
+    public NexusId type() {
+        return DamageModuleOperationIds.ADD_GLOBAL_MITIGATION;
+    }
+
+    @Override
+    public DamageMutationResult apply(DamageRuleContext ctx) {
+        return ctx.tryAddGlobalMitigation(
+                value,
+                RuleTraceIds.ADD_GLOBAL_MITIGATION
+        );
+    }
+
+    @Override
+    public Set<DamagePhase> supportedPhases() {
+        return Set.of(DamagePhase.MITIGATION_SETUP);
+    }
+
+    @Override
+    public float stackingValue() {
+        return value;
+    }
+}

@@ -1,0 +1,144 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.141'
+    id 'me.modmuss50.mod-publish-plugin' version '2.1.1'
+}
+
+def properties = new Properties()
+file('../../gradle.properties').withInputStream { properties.load(it) }
+file('gradle.properties').withInputStream { properties.load(it) }
+properties.each { key, value -> ext.set(key.toString(), value.toString()) }
+
+group = mod_group_id
+version = mod_version
+
+base {
+    archivesName = "${mod_name}-neoforge-1.21.1"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+// common/ is a shared source tree that also compiles standalone
+// (`gradlew -p common build`, see common/build.gradle). Everything without a
+// confirmed version difference lives there, so its sources are compiled into
+// this target by source-set sharing. Its shared resources directory is wired in
+// by gradle/target-conventions/publish.gradle.
+sourceSets {
+    main {
+        java.srcDir "$buildDir/generated/common-main"
+    }
+}
+
+tasks.register('prepareCommonSources', Sync) {
+    from('../../common/src/main/java') {
+        // DamageModule requires the NeoForge 26.1.2 adapters; port tracked in docs/DEVELOPMENT.md.
+        exclude 'io/github/fatalitaya/combatnexus/combat/**'
+        exclude 'io/github/fatalitaya/combatnexus/attribute/**'
+        exclude 'io/github/fatalitaya/combatnexus/formula/**'
+        exclude 'io/github/fatalitaya/combatnexus/effect/**'
+        exclude 'io/github/fatalitaya/combatnexus/presentation/**'
+        // This target's version differences are registered here: exclude one
+        // path per common file that this target replaces with its own
+        // implementation, for example
+        //     exclude 'com/example/network/ChunkPacket.java'
+        // Everything not listed here stays shared with every other target.
+    }
+    into "$buildDir/generated/common-main"
+}
+tasks.named('compileJava').configure { dependsOn 'prepareCommonSources' }
+tasks.named('sourcesJar', Jar).configure {
+    dependsOn 'prepareCommonSources'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+neoForge {
+    version = neoforge_121_version
+
+    runs {
+        client {
+            client()
+            gameDirectory = file('run')
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+repositories {
+    maven {
+        url = 'https://maven.sighs.cc/repository/maven-public/'
+        content { includeGroup 'com.sighs.autojs' }
+    }
+    maven {
+        url = 'https://cursemaven.com'
+        content { includeGroup 'curse.maven' }
+    }
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    // Debug tooling only; not bundled or published as a CombatNexus dependency.
+    runtimeOnly 'com.sighs.autojs:AutoJS-neoforge-1.21.1:1.0.1'
+    // AutoJS declares Rhino in mod metadata, but omits it from its POM.
+    runtimeOnly 'curse.maven:rhino-416294:8463898'
+    // NeoForge development mods; pinned files and official sources: docs/DEVELOPMENT.md.
+    runtimeOnly 'curse.maven:spark-361579:6225208' // 1.10.124
+    runtimeOnly 'curse.maven:jei-238222:8792638' // 19.51.0.418
+    runtimeOnly 'curse.maven:just-enough-characters-250702:8117474' // 4.5.24
+    // Compatibility testing: Apotheosis and its required mod dependencies.
+    runtimeOnly 'curse.maven:apotheosis-313970:8993983' // 8.9.0
+    runtimeOnly 'curse.maven:placebo-283644:9153039' // 9.9.4
+    runtimeOnly 'curse.maven:apothic-attributes-898963:9006294' // 2.11.0
+    // Cataclysm and its required mod dependencies (1.21.1 only).
+    runtimeOnly 'curse.maven:lendercataclysm-551586:8931182' // 3.33
+    runtimeOnly 'curse.maven:curios-309927:6529130' // 9.5.1+1.21.1
+    runtimeOnly 'curse.maven:lionfish-api-1001614:8345326' // 3.1
+
+    runtimeOnly "curse.maven:kubejs-238086:9396059"
+
+    implementation "curse.maven:jade-324717:8591319"
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    def replaceProperties = [
+            minecraft_version     : neoforge_121_minecraft_version,
+            neoforge_version      : neoforge_121_version,
+            neoforge_version_range: neoforge_121_version_range,
+            mod_id                : mod_id,
+            mod_name              : mod_name,
+            mod_license           : mod_license,
+            mod_version           : mod_version,
+            mod_authors           : mod_authors,
+            mod_description       : mod_description
+    ]
+    inputs.properties replaceProperties
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+apply from: file('../../gradle/target-conventions/publish.gradle')
+
+// Scaffolds are not publishable CombatNexus implementations.
+tasks.matching { it.name.startsWith('publish') }.configureEach {
+    doFirst { throw new GradleException('This target is a scaffold; migrate damage adapters before publishing.') }
+}
+sourceSets.main.resources.exclude 'assets/combatnexus/**', 'data/**', 'icon*.png'

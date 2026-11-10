@@ -1,0 +1,23 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:is_player_attack",
+    {
+      "id": "minecraft:player_attack",
+      "required": false
+    },
+    {
+      "id": "minecraft:mob_attack",
+      "required": false
+    },
+    {
+      "id": "minecraft:mob_attack_no_aggro",
+      "required": false
+    },
+    {
+      "id": "minecraft:spear",
+      "required": false
+    },
+    "minecraft:sting"
+  ]
+}

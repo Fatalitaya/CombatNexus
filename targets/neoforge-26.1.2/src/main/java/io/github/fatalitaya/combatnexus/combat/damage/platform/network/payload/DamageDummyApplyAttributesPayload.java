@@ -1,0 +1,55 @@
+package io.github.fatalitaya.combatnexus.combat.damage.platform.network.payload;
+
+import io.github.fatalitaya.combatnexus.platform.NativeIds;
+import io.github.fatalitaya.combatnexus.CombatNexusCommon;
+import io.github.fatalitaya.combatnexus.combat.damage.platform.entity.DamageDummyAttributeEdit;
+import io.github.fatalitaya.combatnexus.combat.damage.platform.entity.DamageDummyAttributeProtocol;
+import io.netty.buffer.ByteBuf;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import io.github.fatalitaya.combatnexus.api.id.NexusId;
+
+/** Client request to atomically edit changed base values on one open menu. */
+public record DamageDummyApplyAttributesPayload(
+        int containerId,
+        BlockPos anchorPos,
+        List<DamageDummyAttributeEdit> edits
+) implements CustomPacketPayload {
+
+    private static final StreamCodec<ByteBuf, List<DamageDummyAttributeEdit>>
+            EDIT_LIST_CODEC = io.github.fatalitaya.combatnexus.combat.damage.platform.network.DamageDummyCodecs.EDIT.apply(
+            ByteBufCodecs.list(DamageDummyAttributeProtocol.MAX_ATTRIBUTES)
+    );
+
+    public static final Type<DamageDummyApplyAttributesPayload> TYPE =
+            new Type<>(io.github.fatalitaya.combatnexus.platform.NativeIds.nativeId(NexusId.fromNamespaceAndPath(
+                    CombatNexusCommon.MOD_ID,
+                    "damage_dummy_apply_attributes"
+            )));
+
+    public static final StreamCodec<
+            ByteBuf,
+            DamageDummyApplyAttributesPayload
+            > STREAM_CODEC = StreamCodec.composite(
+            ByteBufCodecs.VAR_INT,
+            DamageDummyApplyAttributesPayload::containerId,
+            BlockPos.STREAM_CODEC,
+            DamageDummyApplyAttributesPayload::anchorPos,
+            EDIT_LIST_CODEC,
+            DamageDummyApplyAttributesPayload::edits,
+            DamageDummyApplyAttributesPayload::new
+    );
+
+    public DamageDummyApplyAttributesPayload {
+        anchorPos = anchorPos == null ? null : anchorPos.immutable();
+        edits = edits == null ? null : List.copyOf(edits);
+    }
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+}

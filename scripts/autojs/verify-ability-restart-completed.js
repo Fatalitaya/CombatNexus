@@ -1,0 +1,6 @@
+(function(){
+ function cls(n){return Java.loadClass("io.github.fatalitaya.combatnexus."+n);}
+ var level=AutoJS.server().overworld(),UUID=Java.loadClass("java.util.UUID"),actor=level.getEntity(UUID.fromString(RESTART_BEFORE.actor)),world=cls("combat.internal.platform.PlatformWorldLifecycle").existing(level),api=cls("combat.api.CombatAccess").find(level).orElseThrow();
+ try {var pending=api.abilities().execution(UUID.fromString(RESTART_BEFORE.snapshots.ability_delayed.execution)).orElseThrow();if(String(pending.status())!=="COMPLETED"||actor.getHealth()!==RESTART_BEFORE.health+4)throw new Error("Restored continuation did not apply once");if(String(pending.action().id())!==RESTART_BEFORE.snapshots.ability_delayed.action)throw new Error("Restored continuation changed action");if(world.decisionSamples().contains(pending.action().id()))throw new Error("Completed ability retained unowned action samples");return JSON.stringify({ready:true,passed:3,checks:["restored continuation applies once at retained deadline","restored continuation retains action identity","terminal ability releases its final action sample ownership"]});}
+ finally {cls("combat.spi.CombatWorldLifecycleAccess").clear(world,actor.getUUID(),cls("effect.api.EffectService$Removal").WORLD_EXIT);actor.discard();}
+})();

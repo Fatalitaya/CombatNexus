@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "minecraft:wither",
+      "required": false
+    },
+    {
+      "id": "minecraft:wither_skull",
+      "required": false
+    },
+    "#neoforge:is_wither"
+  ]
+}

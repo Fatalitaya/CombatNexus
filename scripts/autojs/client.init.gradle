@@ -1,0 +1,28 @@
+allprojects {
+    afterEvaluate {
+        if (projectDir.name == 'neoforge-26.1.2') {
+            // Core acceptance scripts use AutoJS's native Rhino bindings, not KubeJS remappings.
+            configurations.runtimeClasspath {
+                exclude group: 'curse.maven', module: 'kubejs-238086'
+            }
+            if (providers.gradleProperty('verificationPackaged').map { it.toBoolean() }.getOrElse(false)) {
+                configurations.runtimeOnly.dependencies.removeIf { it instanceof ProjectDependency && it.path == ':combatnexus_compat' }
+                dependencies.add('runtimeOnly', files(tasks.named('jar')))
+                neoForge.runs.client.loadedMods = []
+            }
+            if (!providers.gradleProperty('verificationCompatibility').map { it.toBoolean() }.getOrElse(false)) {
+                configurations.runtimeClasspath {
+                    exclude group: 'curse.maven', module: 'apotheosis-313970'
+                    exclude group: 'curse.maven', module: 'apothic-attributes-898963'
+                    exclude group: 'curse.maven', module: 'placebo-283644'
+                }
+            }
+            neoForge.runs.client {
+                environment 'COMBATNEXUS_VERIFICATION_ID', providers.gradleProperty('verificationInstanceId').getOrElse('external')
+                gameDirectory = file(providers.gradleProperty('verificationClientRunDirectory').getOrElse('build/settings-client-run'))
+                environment 'AUTOJS_PORT', providers.gradleProperty('verificationClientAutojsPort').getOrElse('25591')
+                programArguments.addAll('--username', 'SettingsVerifier')
+            }
+        }
+    }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "combatnexus:vampiric",
+  "display": {
+    "name": {
+      "translate": "entry.combatnexus.vampiric"
+    }
+  },
+  "contributions": [
+    {
+      "id": "combatnexus:bite",
+      "kind": "DAMAGE",
+      "source": "weapon",
+      "rule": {
+        "id": "combatnexus:bite",
+        "phase": "base_modification",
+        "operations": [
+          {
+            "type": "combatnexus:add_base_damage",
+            "channel": "combatnexus:physical",
+            "value": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "combatnexus:lifesteal",
+      "kind": "ATTRIBUTE",
+      "attribute": "combatnexus:lifesteal",
+      "amount": 0.1,
+      "operation": "ADD_VALUE"
+    },
+    {
+      "id": "combatnexus:healing",
+      "kind": "BEHAVIOR",
+      "definition": "combatnexus:periodic_healing"
+    }
+  ]
+}

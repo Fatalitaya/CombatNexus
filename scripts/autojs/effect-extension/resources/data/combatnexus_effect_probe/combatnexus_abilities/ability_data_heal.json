@@ -1,0 +1,8 @@
+{
+  "title": "Data healing",
+  "description": "Registered healing executor referenced by data",
+  "targets": ["SELF", "ENTITY"],
+  "executor": "combatnexus_effect_probe:heal_executor",
+  "parameters": {"numbers": {"amount": 2.0}},
+  "cooldown_ticks": 12
+}

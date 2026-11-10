@@ -1,0 +1,33 @@
+{
+  "id": "combatnexus:vampire",
+  "display": {
+    "name": {
+      "translate": "affix.combatnexus.vampire"
+    }
+  },
+  "rarity": "rare",
+  "stacking": "highest_rarity",
+  "stacking_group": "combatnexus:vampire",
+  "members": [
+    {
+      "id": "combatnexus:fangs",
+      "template": "combatnexus:vampiric"
+    },
+    {
+      "id": "combatnexus:ward",
+      "entry": {
+        "id": "combatnexus:vampire_ward",
+        "display": {},
+        "contributions": [
+          {
+            "id": "combatnexus:shield",
+            "kind": "SHIELD",
+            "definition": "combatnexus:physical_guard",
+            "amount": 20,
+            "duration_ticks": 1200
+          }
+        ]
+      }
+    }
+  ]
+}

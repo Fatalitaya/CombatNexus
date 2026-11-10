@@ -1,0 +1,12 @@
+{
+  "priority": 0,
+  "components": [
+    {
+      "type": "combatnexus:lethal_protection",
+      "cooldown_ticks": 1200
+    }
+  ],
+  "lifetime": {
+    "kind": "PERMANENT"
+  }
+}
