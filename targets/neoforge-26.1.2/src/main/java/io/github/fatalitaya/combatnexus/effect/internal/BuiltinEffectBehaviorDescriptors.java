@@ -88,6 +88,10 @@ public final class BuiltinEffectBehaviorDescriptors {
                     details.add(limit(reflection.limit()));
             return new TooltipBlock(java.util.Optional.<DisplayText>empty(), summary, details);
         });
+        EffectBehaviorDescriptors.register(NexusId.parse("combatnexus:item_block_reflection"), BuiltinBehaviors.ItemBlockReflection.class,
+            (reflection, level) -> new TooltipBlock(Optional.empty(),
+                List.of(text("item_block_reflection", TooltipNumbers.percent(reflection.ratio()))),
+                List.of(text("item_block_reflection.detail"), limit(reflection.limit()))));
         EffectBehaviorDescriptors.register(NexusId.parse("combatnexus:overflow_shield"), BuiltinBehaviors.OverflowShield.class, (shield, level) -> {
             var summary = new ArrayList<DisplayText>();
             var details = new ArrayList<DisplayText>();

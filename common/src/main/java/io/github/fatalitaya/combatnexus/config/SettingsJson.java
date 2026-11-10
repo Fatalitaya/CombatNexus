@@ -24,11 +24,44 @@ public final class SettingsJson {
             if (text.length() + count > maximumCharacters) throw new IllegalArgumentException("JSON exceeds " + maximumCharacters + " characters");
             text.append(buffer, 0, count);
         }
+        verifyLexemes(text);
         try (JsonReader input = new JsonReader(new StringReader(text.toString()))) {
-            input.setStrictness(Strictness.STRICT);
+            input.setLenient(false);
             JsonObject value = readValue(input, 0, new int[]{0}, maximumNodes).getAsJsonObject();
             if (input.peek() != JsonToken.END_DOCUMENT) throw new IllegalArgumentException("Trailing JSON content");
             return value;
+        }
+    }
+    // Gson 2.10's non-lenient reader still accepts a few non-JSON lexemes.
+    private static void verifyLexemes(CharSequence text) {
+        for (int i = 0; i < text.length();) {
+            char c = text.charAt(i++);
+            if (c == '"') {
+                boolean closed = false;
+                while (i < text.length()) {
+                    c = text.charAt(i++);
+                    if (c == '"') { closed = true; break; }
+                    if (c < 0x20) throw new IllegalArgumentException("Unescaped JSON control character");
+                    if (c == '\\') {
+                        if (i == text.length()) throw new IllegalArgumentException("Incomplete JSON escape");
+                        char escape = text.charAt(i++);
+                        if (escape == 'u') {
+                            for (int digit = 0; digit < 4; digit++) {
+                                if (i == text.length() || "0123456789abcdefABCDEF".indexOf(text.charAt(i++)) < 0)
+                                    throw new IllegalArgumentException("Invalid JSON Unicode escape");
+                            }
+                        } else if ("\"\\/bfnrt".indexOf(escape) < 0) throw new IllegalArgumentException("Invalid JSON escape");
+                    }
+                }
+                if (!closed) throw new IllegalArgumentException("Unterminated JSON string");
+            } else if ("{}[],: \t\r\n".indexOf(c) < 0) {
+                int start = i - 1;
+                while (i < text.length() && "{}[],: \t\r\n".indexOf(text.charAt(i)) < 0) i++;
+                String token = text.subSequence(start, i).toString();
+                if (!token.equals("true") && !token.equals("false") && !token.equals("null")
+                        && !token.matches("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?"))
+                    throw new IllegalArgumentException("Invalid JSON token");
+            }
         }
     }
     private static JsonElement readValue(JsonReader input, int depth, int[] nodes, int maximumNodes) throws IOException {

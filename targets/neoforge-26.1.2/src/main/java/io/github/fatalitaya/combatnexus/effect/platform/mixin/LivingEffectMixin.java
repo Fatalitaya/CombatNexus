@@ -34,6 +34,17 @@ public abstract class LivingEffectMixin implements NativeEffectProjection {
             com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
         if (!NativeEffectBridge.managed(net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect))) original.call(effect, attributes);
     }
+    @com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(method = "addEffect(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z",
+        at = @At(value = "INVOKE", target = "Lnet/neoforged/neoforge/common/CommonHooks;canMobEffectBeApplied(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z"))
+    private boolean combatnexus$explicitForce(LivingEntity target,MobEffectInstance effect,Entity source,com.llamalad7.mixinextras.injector.wrapoperation.Operation<Boolean> original){
+        if(io.github.fatalitaya.combatnexus.effect.platform.ForcedNativeEffect.consume(target,effect))return true;
+        if(NativeEffectBridge.ready(target)){
+            var id=io.github.fatalitaya.combatnexus.platform.NativeIds.nexus(effect.getEffect().unwrapKey().orElseThrow().identifier());
+            var runtime=io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing((ServerLevel)target.level());
+            if(runtime.effects().immune(target.getUUID(),id,NativeEffectBridge.tags(effect.getEffect()),NativeEffectBridge.controlCategories(id)))return false;
+        }
+        return original.call(target,effect,source);
+    }
     @Unique private LivingEntity combatnexus$self() { return (LivingEntity)(Object)this; }
     @Inject(method = "addEffect(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z", at = @At("HEAD"), cancellable = true)
     private void combatnexus$add(MobEffectInstance effect, Entity source, CallbackInfoReturnable<Boolean> ci) {

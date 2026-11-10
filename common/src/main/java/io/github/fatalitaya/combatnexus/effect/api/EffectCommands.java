@@ -2,6 +2,8 @@ package io.github.fatalitaya.combatnexus.effect.api;
 import java.util.*;
 import io.github.fatalitaya.combatnexus.combat.api.transaction.CombatParent;
 public interface EffectCommands {
+    io.github.fatalitaya.combatnexus.combat.api.CommandResult<List<EffectCleanse.Entry>> cleanse(EffectCleanse request);
+    io.github.fatalitaya.combatnexus.combat.api.CommandResult<List<EffectCleanse.Entry>> cleanse(EffectCleanse request,CombatParent parent);
     EffectResult fact(UUID request, EffectFact fact);
     io.github.fatalitaya.combatnexus.combat.api.CommandResult<Integer> clear(UUID request, UUID target);
     io.github.fatalitaya.combatnexus.combat.api.CommandResult<Boolean> remove(UUID request, UUID target, io.github.fatalitaya.combatnexus.api.id.NexusId effect,

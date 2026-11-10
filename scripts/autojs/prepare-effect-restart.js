@@ -55,5 +55,13 @@
     var task=new Task(UUID.randomUUID(),source,Optional.empty(),level.getGameTime()+137,23,4,new Ignite(9),Set.of(),true);
     if(!scheduler.schedule(UUID.randomUUID(),cow.getUUID(),task).applied())throw new Error("Restart schedule rejected");
     cls("combat.platform.CombatPersistence").save(cow);
+    var api=cls("combat.api.CombatAccess").find(level).orElseThrow(),controlSource=Id.parse("combatnexus_effect_probe:control_restart"),Control=cls("effect.api.EffectControl"),Category=cls("effect.api.ControlCategory"),Policy=cls("effect.api.EffectPolicy"),Mode=cls("effect.api.EffectApplicationPolicy"),ES=cls("effect.api.EffectService");
+    world.sourcePersistence(cow.getUUID(),controlSource,cls("combat.internal.CombatRuntime$SourcePersistence").PERSISTENT);
+    function retained(name,control,mode){var definition=new (cls("effect.api.EffectDefinition"))(0,cls("effect.api.EffectLifetime").permanent(),ES.Stacking.REPLACE.id(),new Policy(Policy.Category.NEUTRAL,true,Set.of(controlSource),control,mode),List.of(),cls("combat.api.behavior.BehaviorPlan").NONE,Set.of(),cls("effect.api.EffectDisplay").NONE);
+        var result=api.effects().apply(new (cls("effect.api.EffectApplication"))(UUID.randomUUID(),definition.instantiate(cow.getUUID(),Id.parse("combatnexus_effect_probe:"+name),controlSource,api.time().now(cow.getUUID(),controlSource)),ES.Stacking.REPLACE));if(result.rejection().isPresent())throw new Error("Persistent control refused: "+name);}
+    retained("normal_control",new Control(Set.of(Category.MOVEMENT),Set.of(),Set.of(),Set.of()),Mode.NORMAL);
+    retained("saved_immunity",new Control(Set.of(),Set.of(Id.parse("minecraft:blindness")),Set.of(controlSource),Set.of(Category.MOVEMENT)),Mode.NORMAL);
+    retained("forced_control",new Control(Set.of(Category.MOVEMENT),Set.of(),Set.of(),Set.of()),Mode.FORCE);
+    cls("combat.platform.CombatPersistence").save(cow);
     return JSON.stringify({equipmentRemaining:world.behaviors().capture(equipped.getUUID()).get(0).expiresAtTick().getAsLong()-level.getGameTime(),gameTick:level.getGameTime(),equipment:JSON.parse(String(equipped.getPersistentData().getString("combatnexus:combat_state").orElseThrow())),prepared:true,target:String(cow.getUUID()),passed:4,saved:JSON.parse(String(cow.getPersistentData().getString("combatnexus:combat_state").orElseThrow()))});
 })()

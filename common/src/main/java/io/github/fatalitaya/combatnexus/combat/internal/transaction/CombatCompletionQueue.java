@@ -46,7 +46,7 @@ public final class CombatCompletionQueue {
         ready.add(this);
     }
     public static void drainIfSafe() {
-        if (CombatExecutionScope.isActive() || CombatDispatchScope.isActive() || draining()) return;
+        if (CombatExecutionScope.isActive() || CombatDispatchScope.isActive() || WorldLifecycleScope.active() || draining()) return;
         var ready = READY.get();
         if (ready == null) return;
         DRAINING.set(true);

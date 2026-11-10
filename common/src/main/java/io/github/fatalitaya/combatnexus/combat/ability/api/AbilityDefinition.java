@@ -9,7 +9,10 @@ import java.util.*;
 
 /** Generic ability content, without learning, preparation or tactical action costs. */
 public record AbilityDefinition(NexusId id, String title, String description, Set<AbilityTarget.Kind> targets,
-        NexusId executor, AbilityParameters parameters, int cooldownTicks, Optional<NexusId> sharedCooldown, AbilityTrigger trigger) {
+        NexusId executor, AbilityParameters parameters, int cooldownTicks, Optional<NexusId> sharedCooldown, int sharedCooldownTicks, CooldownOwner cooldownOwner, CooldownStart cooldownStart, DeathCooldown deathCooldown, AbilityTrigger trigger) {
+    public enum CooldownOwner { PLAYER_SKILL, SOURCE_CONTRIBUTION }
+    public enum CooldownStart { ADMISSION, EXECUTION_END }
+    public enum DeathCooldown { RETAIN, CLEAR }
     private static Set<AbilityTarget.Kind> targetSet(List<AbilityTarget.Kind> values) {
         if (new HashSet<>(values).size() != values.size()) throw new IllegalArgumentException("Duplicate ability target kind");
         return Set.copyOf(values);
@@ -24,6 +27,10 @@ public record AbilityDefinition(NexusId id, String title, String description, Se
         AbilityParameters.CODEC.optionalFieldOf("parameters", AbilityParameters.EMPTY).forGetter(AbilityDefinition::parameters),
         Codec.INT.optionalFieldOf("cooldown_ticks", 0).forGetter(AbilityDefinition::cooldownTicks),
         NexusIdCodecs.CODEC.optionalFieldOf("shared_cooldown").forGetter(AbilityDefinition::sharedCooldown),
+        Codec.intRange(0,1200000).optionalFieldOf("shared_cooldown_ticks",0).forGetter(AbilityDefinition::sharedCooldownTicks),
+        Codec.STRING.xmap(CooldownOwner::valueOf,Enum::name).optionalFieldOf("cooldown_owner",CooldownOwner.PLAYER_SKILL).forGetter(AbilityDefinition::cooldownOwner),
+        Codec.STRING.xmap(CooldownStart::valueOf,Enum::name).optionalFieldOf("cooldown_start",CooldownStart.ADMISSION).forGetter(AbilityDefinition::cooldownStart),
+        Codec.STRING.xmap(DeathCooldown::valueOf,Enum::name).optionalFieldOf("death_cooldown",DeathCooldown.RETAIN).forGetter(AbilityDefinition::deathCooldown),
         AbilityTrigger.CODEC.optionalFieldOf("trigger", AbilityTrigger.ACTIVE).forGetter(AbilityDefinition::trigger)
     ).apply(i, AbilityDefinition::new));
     public static final Codec<AbilityDefinition> CODEC = CodecBudgets.guardRawStructure(new Codec<>() {
@@ -36,6 +43,8 @@ public record AbilityDefinition(NexusId id, String title, String description, Se
     public AbilityDefinition {
         Objects.requireNonNull(id); Objects.requireNonNull(title); Objects.requireNonNull(description);
         Objects.requireNonNull(executor); Objects.requireNonNull(parameters); Objects.requireNonNull(sharedCooldown); Objects.requireNonNull(trigger);
+        Objects.requireNonNull(cooldownOwner); Objects.requireNonNull(cooldownStart); Objects.requireNonNull(deathCooldown);
+        if(sharedCooldownTicks<0||sharedCooldownTicks>1200000||(sharedCooldown.isEmpty()&&sharedCooldownTicks!=0))throw new IllegalArgumentException("Invalid shared cooldown");
         targets = Set.copyOf(targets);
         if (targets.isEmpty() || cooldownTicks < 0 || cooldownTicks > 1200000 || title.codePointCount(0,title.length()) > 256
                 || description.codePointCount(0,description.length()) > 2048) throw new IllegalArgumentException("Invalid ability definition");
@@ -50,7 +59,7 @@ public record AbilityDefinition(NexusId id, String title, String description, Se
         return CODEC.parse(JsonOps.INSTANCE, complete).getOrThrow();
     }
     private static void validateFields(JsonObject json) {
-        keys(json, "id", "title", "description", "targets", "executor", "parameters", "cooldown_ticks", "shared_cooldown", "trigger");
+        keys(json, "id", "title", "description", "targets", "executor", "parameters", "cooldown_ticks", "shared_cooldown", "shared_cooldown_ticks", "cooldown_owner", "cooldown_start", "death_cooldown", "trigger");
         if (json.has("parameters")) keys(json.getAsJsonObject("parameters"), "numbers", "ids");
         if (json.has("trigger")) {
             var trigger = json.getAsJsonObject("trigger"); keys(trigger, "kind", "limit", "interval_ticks", "first_delay_ticks");

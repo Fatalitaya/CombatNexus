@@ -8,6 +8,7 @@ import io.github.fatalitaya.combatnexus.combat.healing.api.*;
 import io.github.fatalitaya.combatnexus.combat.shield.api.ShieldSettlement;
 import io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatDispatchScope;
 import java.util.*;
+import io.github.fatalitaya.combatnexus.combat.ability.api.AbilityFact;
 import java.util.function.Consumer;
 import io.github.fatalitaya.combatnexus.api.id.NexusId;
 
@@ -96,6 +97,9 @@ public final class CombatExtensions {
     private static List<CombatListenerRegistry.Entry<io.github.fatalitaya.combatnexus.combat.api.source.SourceProvider>> providers = List.of();
     public static List<CombatListenerRegistry.Entry<io.github.fatalitaya.combatnexus.combat.api.source.SourceProvider>> sourceProviders() { return providers; }
     private static DomainPipeline<HealingPhase, Consumer<HealingCalculation>> healing = new DomainPipeline.Builder<HealingPhase, Consumer<HealingCalculation>>(HealingPhase.class).freeze();
+    private record AbilityReaction(NexusId id,int priority,Set<CombatOperation> permissions,Consumer<CombatCallback<AbilityFact>> handler) {}
+    private static List<AbilityReaction> abilityReactions=List.of();
+    private static List<CombatListenerRegistry.Entry<Consumer<AbilityFact>>> abilityObservers=List.of();
     private static List<Reaction> healingReactions = List.of();
     private static List<CombatListenerRegistry.Entry<Consumer<HealingSettlement>>> healingObservers = List.of();
     private static List<CombatListenerRegistry.Entry<Consumer<ShieldSettlement>>> shieldObservers = List.of();
@@ -117,6 +121,8 @@ public final class CombatExtensions {
         session.providers.freeze(); providers = session.providers.entries();
         session.healObservers.freeze(); healingObservers = session.healObservers.entries();
         session.shieldObservers.freeze(); shieldObservers = session.shieldObservers.entries();
+        session.abilityObservers.freeze();abilityObservers=session.abilityObservers.entries();
+        abilityReactions=session.abilityReactions.values().stream().sorted(Comparator.comparingInt(AbilityReaction::priority).reversed().thenComparing(r->r.id().toString())).toList();
         session.stateObservers.freeze(); stateObservers = session.stateObservers.entries();
         healingReactions = session.reactions.values().stream().sorted(Comparator.comparingInt(Reaction::priority).reversed().thenComparing(r -> r.id().toString())).toList();
         BehaviorTypes.freeze();
@@ -238,6 +244,8 @@ public final class CombatExtensions {
         final CombatListenerRegistry<Consumer<HealingSettlement>> healObservers = new CombatListenerRegistry<>();
         final CombatListenerRegistry<Consumer<ShieldSettlement>> shieldObservers = new CombatListenerRegistry<>();
         final CombatListenerRegistry<Consumer<CommandResult<?>>> stateObservers = new CombatListenerRegistry<>();
+        final CombatListenerRegistry<Consumer<AbilityFact>> abilityObservers=new CombatListenerRegistry<>();
+        final Map<NexusId,AbilityReaction> abilityReactions=new HashMap<>();
         final Map<NexusId, Reaction> reactions = new HashMap<>();
         void check() { if (!open) throw new IllegalStateException("Registration callback expired"); }
         public <T extends io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorComponent> void behavior(io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorType<T> type) { check(); BehaviorTypes.register(type); }
@@ -254,6 +262,11 @@ public final class CombatExtensions {
         }
         public void observe(NexusId id, int priority, Consumer<HealingSettlement> observer) { check(); healObservers.register(id, priority, observer); }
         public void observeShield(NexusId id, int priority, Consumer<ShieldSettlement> observer) { check(); shieldObservers.register(id, priority, observer); }
+        public void observeAbility(NexusId id,int priority,Consumer<AbilityFact> observer){check();abilityObservers.register(id,priority,observer);}
+        public void reactAbility(NexusId id,int priority,Set<CombatOperation> permissions,Consumer<CombatCallback<AbilityFact>> reaction){
+            check();priority(priority);var entry=new AbilityReaction(Objects.requireNonNull(id),priority,Set.copyOf(permissions),Objects.requireNonNull(reaction));
+            if(abilityReactions.putIfAbsent(id,entry)!=null)throw new IllegalArgumentException("Duplicate ability reaction: "+id);
+        }
         public void observeState(NexusId id, int priority, Consumer<CommandResult<?>> observer) { check(); stateObservers.register(id, priority, observer); }
         public void react(NexusId id, int priority, Set<CombatOperation> permissions, Consumer<CombatCallback<HealingSettlement>> handler) {
             check(); priority(priority);
@@ -296,5 +309,13 @@ public final class CombatExtensions {
         observe(server, result, healingObservers);
     }
     public static void shieldCompleted(ServerSession server, ShieldSettlement result) { observe(server, result, shieldObservers); }
+    public static void abilityCompleted(ServerSession server,CombatLineage lineage,AbilityFact fact){
+        if(lineage!=null)for(var entry:abilityReactions){
+            var callback=new CombatCallback<>(lineage,fact,server);
+            try(var scope=CombatDispatchScope.callback(OWNER,callback,null,server,lineage,entry.permissions())){entry.handler().accept(callback);}
+            catch(Throwable failure){CombatFailures.rethrowFatal(failure);}
+        }
+        observe(server,fact,abilityObservers);
+    }
     public static void stateCompleted(ServerSession server, CombatLineage lineage, CommandResult<?> result) { observe(server, result, stateObservers); }
 }

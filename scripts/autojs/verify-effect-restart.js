@@ -60,5 +60,13 @@
     check(task.nextTick()-level.getGameTime()===137&&task.interval()===23&&task.repetitions()===4&&task.intent().ticks()===9,"restart preserves exact schedule delay interval repetitions and parameters");
     var UUID=Java.loadClass("java.util.UUID");
     check(scheduler.cancel(UUID.randomUUID(),cow.getUUID(),task.id()).applied()&&scheduler.snapshot(cow.getUUID()).isEmpty(),"restored schedule can be revoked");
+    var controls=cls("combat.api.CombatWorldSessions").managedEffects(level,cow.getUUID()),normal=null,forced=null,immune=null;
+    for(var state of controls){var name=String(state.snapshot().effect());if(name==="combatnexus_effect_probe:normal_control")normal=state;if(name==="combatnexus_effect_probe:forced_control")forced=state;if(name==="combatnexus_effect_probe:saved_immunity")immune=state;}
+    check(normal!==null&&immune!==null,"restoring immunity does not retroactively cleanse existing ordinary control");
+    check(forced!==null&&String(forced.policy().application())==="FORCE"&&String(normal.policy().application())==="NORMAL","actual application policies survive process restart independently");
+    var Set=Java.loadClass("java.util.Set"),Category=cls("effect.api.ControlCategory");
+    check(world.effects().immune(cow.getUUID(),Id.parse("minecraft:blindness"),Set.of(),Set.of()),"effect ID immunity survives process restart");
+    check(world.effects().immune(cow.getUUID(),Id.parse("combatnexus_effect_probe:tagged"),Set.of(Id.parse("combatnexus_effect_probe:control_restart")),Set.of()),"tag immunity survives process restart");
+    check(world.effects().immune(cow.getUUID(),Id.parse("combatnexus_effect_probe:moving"),Set.of(),Set.of(Category.MOVEMENT)),"control category immunity survives process restart");
     equipped.discard();cow.discard();return JSON.stringify({ready:true,passed:checks.length,checks:checks});
 })()

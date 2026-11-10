@@ -20,21 +20,28 @@ public final class StateCommands {
     public static <T> CommandResult<T> submit(CombatRuntime world, UUID request, UUID target,
             CombatOperation operation, Optional<CombatSource> source, CombatParent parent,
             io.github.fatalitaya.combatnexus.combat.internal.definition.DefinitionGeneration definitions, Supplier<CommandResult<T>> action) {
+        return submit(world, request, target, operation, source, parent, definitions, false, action);
+    }
+    public static <T> CommandResult<T> submit(CombatRuntime world, UUID request, UUID target,
+            CombatOperation operation, Optional<CombatSource> source, CombatParent parent,
+            io.github.fatalitaya.combatnexus.combat.internal.definition.DefinitionGeneration definitions,
+            boolean allowDyingTarget, Supplier<CommandResult<T>> action) {
         var context = new CommandContext(request, target, operation, source, Optional.empty(), Optional.empty());
-        var result = execute(world, request, target, operation, source, parent, definitions, action);
+        var result = execute(world, request, target, operation, source, parent, definitions, allowDyingTarget, action);
         result=result.context().isPresent() ? result : result.withContext(context);
         io.github.fatalitaya.combatnexus.combat.internal.coordination.BridgeExecutions.record(result);
         return result;
     }
     private static <T> CommandResult<T> execute(CombatRuntime world, UUID request, UUID target,
             CombatOperation operation, Optional<CombatSource> source, CombatParent parent,
-            io.github.fatalitaya.combatnexus.combat.internal.definition.DefinitionGeneration definitions, Supplier<CommandResult<T>> action) {
+            io.github.fatalitaya.combatnexus.combat.internal.definition.DefinitionGeneration definitions, boolean allowDyingTarget, Supplier<CommandResult<T>> action) {
         var server = world.serverRuntime();
         if (server.isClosed() || world.commandSessionClosed()) return CommandResult.rejected(CommandRejection.Code.CLOSED_SESSION, "World session unavailable");
         if (!server.claim(operation, request)) return CommandResult.rejected(CommandRejection.Code.DUPLICATE, "Request already submitted");
         if (!server.isOwningThread()) return CommandResult.rejected(CommandRejection.Code.WRONG_THREAD, "Owning server thread required");
         if (server.world(world.worldSession()).orElse(null) != world) return CommandResult.rejected(CommandRejection.Code.CLOSED_SESSION, "World session unavailable");
-        if (!world.targetAlive(target)) return CommandResult.rejected(CommandRejection.Code.TARGET_UNAVAILABLE, "Live target required");
+        if (!world.targetAlive(target) && !(allowDyingTarget && operation == CombatOperation.MOVEMENT
+                && world.level().getEntity(target) instanceof net.minecraft.world.entity.LivingEntity entity && !entity.isRemoved())) return CommandResult.rejected(CommandRejection.Code.TARGET_UNAVAILABLE, "Live target required");
         CombatLineage lineage;
         try { lineage = server.requestLineage(operation, parent); }
         catch (IllegalStateException rejected) { return CommandResult.rejected(CommandRejection.Code.INVALID_PHASE, rejected.getMessage()); }

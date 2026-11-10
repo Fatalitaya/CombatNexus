@@ -7,6 +7,14 @@
  var snapshots={};for(var grant of api.abilities().grants(actor.getUUID())){var request=new (cls("combat.ability.api.AbilityRequest"))(UUID.randomUUID(),grant,new (cls("combat.ability.api.AbilityTarget$Self"))(),cls("combat.ability.api.AbilityParameters").EMPTY),result;if(String(grant.ability().path())==="ability_periodic"){var session=api.drivers().bind(Java.loadClass("probe.DriverExtension").abilities,actor.getUUID(),Java.loadClass("java.util.Set").of(cls("combat.driver.api.DriverScope").PERIODIC),Optional.empty());try{result=session.trigger(request);}finally{session.close();}}else result=api.abilities().execute(request);if(!result.receipt().applied())throw new Error("restart ability rejected: "+result);var snapshot=result.execution().orElseThrow();snapshots[String(grant.ability().path())]={execution:String(snapshot.execution()),action:String(snapshot.action().id())};}
  var pendingAction=UUID.fromString(snapshots.ability_delayed.action),samples=cls("combat.internal.platform.PlatformWorldLifecycle").existing(level).decisionSamples();
  samples.sample(pendingAction,Probe.id("restart_policy"),Probe.id("restart_decision"),Optional.empty(),function(){return Java.loadClass("java.lang.Float").valueOf(0.25);});
+ var windowId=Probe.id("window"),windowSource=new (cls("combat.api.source.SourceInstance"))(UUID.randomUUID(),Probe.id("restart_window"),Optional.of(actor.getUUID()),"restart"),windowPlan=new (cls("combat.api.source.SourcePlan"))(windowId,Map.of(),Map.of(),Map.of(),Map.of(windowId,windowId),true);
+ api.sources().install(new (cls("combat.api.source.SourceInstallation"))(UUID.randomUUID(),actor.getUUID(),windowSource,windowPlan));
+ var windowGrant=api.abilities().grants(actor.getUUID()).stream().filter(function(g){return g.ability().equals(windowId);}).findFirst().orElseThrow();
+ var windowResult=api.abilities().execute(new (cls("combat.ability.api.AbilityRequest"))(UUID.randomUUID(),windowGrant,new (cls("combat.ability.api.AbilityTarget$Self"))(),cls("combat.ability.api.AbilityParameters").EMPTY));
+ if(!windowResult.receipt().applied())throw new Error("Restart input window refused");
+ snapshots.window={execution:String(windowResult.execution().orElseThrow().execution())};
+ var Command=cls("combat.ability.api.AbilityCooldownCommand"),Slot=cls("combat.ability.api.AbilityCooldownSlot"),commandSource=new (cls("combat.api.CombatSource"))(windowId,Optional.of(actor.getUUID()),Optional.empty());
+ api.abilities().cooldown(new Command(UUID.randomUUID(),actor.getUUID(),commandSource,new Slot.Skill(windowId),Command.Operation.RESET,40));
  actor.setHealth(1);cls("combat.platform.CombatPersistence").save(actor);
  return JSON.stringify({prepared:true,gameTick:Number(level.getGameTime()),actor:String(actor.getUUID()),health:Number(actor.getHealth()),snapshots:snapshots});
 })();

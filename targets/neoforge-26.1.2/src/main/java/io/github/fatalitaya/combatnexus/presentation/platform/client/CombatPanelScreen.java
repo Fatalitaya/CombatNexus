@@ -6,7 +6,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import java.util.*;
 
-/** Combines native client entity state with its tracked server supplements. */
+/** Complete server-owned panel data for the current screen subscription. */
 public final class CombatPanelScreen extends Screen {
     private List<Component> rows = List.of(Component.translatable("gui.combatnexus.panel.loading"));
     private int scroll;
@@ -56,6 +56,7 @@ public final class CombatPanelScreen extends Screen {
     }
     private static String number(double value) { return io.github.fatalitaya.combatnexus.presentation.api.TooltipNumbers.number(value); }
     private int visible() { return Math.max(1, (height - 68) / 12); }
+    @Override public void removed() { ClientEntityCombatMirrors.clear(); super.removed(); }
     @Override public boolean isPauseScreen() { return false; }
     @Override public boolean mouseScrolled(double x, double y, double dx, double dy) {
         scroll = Math.clamp(scroll - (int) Math.signum(dy) * 3, 0, Math.max(0, rows.size() - visible()));

@@ -32,6 +32,9 @@ public final class BuiltinBehaviorTypes {
         add("reflection", BuiltinBehaviors.Reflection.class, RecordCodecBuilder.mapCodec(i -> i.group(
             Codec.DOUBLE.fieldOf("ratio").forGetter(BuiltinBehaviors.Reflection::ratio),
             LIMIT.codec().fieldOf("limit").forGetter(BuiltinBehaviors.Reflection::limit)).apply(i, BuiltinBehaviors.Reflection::new)));
+        add("item_block_reflection", BuiltinBehaviors.ItemBlockReflection.class, RecordCodecBuilder.mapCodec(i -> i.group(
+            Codec.DOUBLE.fieldOf("ratio").forGetter(BuiltinBehaviors.ItemBlockReflection::ratio),
+            LIMIT.codec().fieldOf("limit").forGetter(BuiltinBehaviors.ItemBlockReflection::limit)).apply(i, BuiltinBehaviors.ItemBlockReflection::new)));
         add("overflow_shield", BuiltinBehaviors.OverflowShield.class, RecordCodecBuilder.mapCodec(i -> i.group(
             Codec.DOUBLE.fieldOf("ratio").forGetter(BuiltinBehaviors.OverflowShield::ratio),
             Codec.DOUBLE.fieldOf("capacity").forGetter(BuiltinBehaviors.OverflowShield::capacity),

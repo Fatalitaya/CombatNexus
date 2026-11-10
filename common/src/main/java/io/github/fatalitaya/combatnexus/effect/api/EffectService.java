@@ -19,6 +19,8 @@ public interface EffectService {
     void remove(UUID target, NexusId effect, NexusId source, Removal reason);
     List<EffectInstance> snapshot(UUID target);
     List<EffectInstance> snapshot(UUID target, java.util.function.IntConsumer budget);
+    boolean immune(UUID target,NexusId effect,Set<NexusId> tags,Set<ControlCategory> categories);
+    List<EffectCleanse.Entry> cleanse(EffectCleanse request);
     int restrictionMask(UUID target);
     Set<NexusId> pendingSources(UUID target);
 

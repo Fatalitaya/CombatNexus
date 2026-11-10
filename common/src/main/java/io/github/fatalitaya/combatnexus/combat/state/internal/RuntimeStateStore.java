@@ -43,6 +43,18 @@ public final class RuntimeStateStore {
         values.put(key,stored);return detached;
     }
 
+    public <T> Optional<T> take(StateAddress<T> address) {
+        RuntimeStateTypes.require(address.key());
+        var key = new Key(address.key().id(), address.scope());
+        var stored = values.get(key);
+        if (stored == null) return Optional.empty();
+        T detached;
+        try (var read = io.github.fatalitaya.combatnexus.combat.api.transaction.CombatReadScope.open()) {
+            detached = typed(stored, address.key()).detached();
+        }
+        values.remove(key);
+        return Optional.of(detached);
+    }
     public boolean remove(StateAddress<?> address) { RuntimeStateTypes.require(address.key());return values.remove(new Key(address.key().id(),address.scope()))!=null; }
     public void clear(StateKey.Boundary boundary,Optional<UUID> scope) {
         values.keySet().removeIf(k->RuntimeStateTypes.get(k.type()).clearOn().contains(boundary)&&(scope.isEmpty()||k.scope().equals(scope)));

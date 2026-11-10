@@ -8,5 +8,7 @@ import java.util.UUID;
 /** World-owned equipment reads. Missing means the target is not loaded in this world. */
 public interface EquipmentObservation {
     boolean alive(UUID target);
+    default void clear(UUID target) {}
+    default void close() {}
     Optional<EquipmentItem> item(UUID target, EquipmentPosition slot);
 }

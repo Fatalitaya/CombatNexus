@@ -14,28 +14,43 @@ public final class NativeEntityCapture {
     }
     public record Participant(CombatInputFrame frame, Captured nativeFacts) {}
     public static Captured capture(LivingEntity entity) {
-        var category = io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().entityCategory(entity.getType());
-        var entityType = io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().entityTypeFacts(entity.getType());
+        return capture(entity, ignored -> {}, true);
+    }
+    public static CombatEntityFacts captureFacts(LivingEntity entity, java.util.function.IntConsumer budget) {
+        return capture(entity, budget, false).facts();
+    }
+    private static Captured capture(LivingEntity entity, java.util.function.IntConsumer budget, boolean nativeStacks) {
+        var content = io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get();
+        var category = content.entityCategory(entity.getType());
+        var entityType = content.entityTypeFacts(entity.getType());
         int chargeTicks = entity.getTicksUsingItem();
         float attackStrength = entity instanceof net.minecraft.world.entity.player.Player player ? player.getAttackStrengthScale(0.5F) : 1;
         float health = entity.getHealth(), maxHealth = entity.getMaxHealth();
         boolean onFire = entity.isOnFire();
         var equipment = new EnumMap<EquipmentPosition, CapturedItem>(EquipmentPosition.class);
-        for (var slot : EquipmentSlot.values()) equipment.put(EquipmentPosition.valueOf(slot.name()), new CapturedItem(entity.getItemBySlot(slot)));
-        if (entity.level() instanceof net.minecraft.server.level.ServerLevel level) {
-            var world = io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing(level);
-            if (world != null) { var selection = world.equipmentSelection(entity.getUUID()); equipment.replaceAll((slot,item) -> {
-                var selected = selection.capture(item.facts(), slot);
-                var stack = item.copyStack(); stack.remove(CombatDataComponents.PATCH.get()); stack.remove(CombatDataComponents.BINDINGS.get());
-                return new CapturedItem(stack, selected.defaultBindings(), selected.entries(), selected.affixes());
-            }); }
-        }
-        var weaponSlot = !ItemStack.isSameItemSameComponents(entity.getWeaponItem(),entity.getMainHandItem()) && ItemStack.isSameItemSameComponents(entity.getWeaponItem(),entity.getOffhandItem()) && !entity.getOffhandItem().isEmpty() ? EquipmentPosition.OFFHAND : EquipmentPosition.MAINHAND;
-        var weapon = equipment.get(weaponSlot);
-        var effects = io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().captureEffects(entity, ignored -> {});
-        var external = io.github.fatalitaya.combatnexus.combat.internal.registration.CombatExtensions.captureFacts(entity);
         var values = new EnumMap<EquipmentPosition, ItemFacts>(EquipmentPosition.class);
-        equipment.forEach((slot,item) -> values.put(slot, item.facts()));
-        return new Captured(new CombatEntityFacts(entityType, category, health, maxHealth, onFire, external, weapon.facts(), chargeTicks, attackStrength, values, effects), weapon, equipment);
+        var world = entity.level() instanceof net.minecraft.server.level.ServerLevel level
+            ? io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing(level) : null;
+        var selection = world == null ? null : world.equipmentSelection(entity.getUUID());
+        for (var slot : EquipmentSlot.values()) {
+            var position = EquipmentPosition.valueOf(slot.name());
+            var stack = entity.getItemBySlot(slot);
+            var facts = new ItemFacts(stack.isEmpty(), content.itemId(stack.getItem()), stack.getCount(),
+                io.github.fatalitaya.combatnexus.combat.api.item.CombatItems.defaults(stack),
+                io.github.fatalitaya.combatnexus.combat.api.item.CombatItems.patch(stack), Optional.empty(), Optional.empty());
+            var selected = selection == null ? facts : selection.capture(facts, position);
+            values.put(position, selected);
+            if (nativeStacks) equipment.put(position, new CapturedItem(stack, selected.defaultBindings(), selected.entries(), selected.affixes()));
+        }
+        var weaponSlot = !ItemStack.isSameItemSameComponents(entity.getWeaponItem(), entity.getMainHandItem())
+            && ItemStack.isSameItemSameComponents(entity.getWeaponItem(), entity.getOffhandItem()) && !entity.getOffhandItem().isEmpty()
+            ? EquipmentPosition.OFFHAND : EquipmentPosition.MAINHAND;
+        var effects = content.captureEffects(entity, budget);
+        var external = io.github.fatalitaya.combatnexus.combat.internal.registration.CombatExtensions.captureFacts(entity);
+        var facts = new CombatEntityFacts(entityType, category, health, maxHealth, onFire,
+            external,
+            values.get(weaponSlot), chargeTicks, attackStrength,
+            values, io.github.fatalitaya.combatnexus.platform.NativeEquipment.positions(), effects);
+        return new Captured(facts, equipment.get(weaponSlot), equipment);
     }
 }

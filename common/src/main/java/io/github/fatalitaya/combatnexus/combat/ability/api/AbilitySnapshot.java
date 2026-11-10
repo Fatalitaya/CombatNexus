@@ -5,7 +5,9 @@ import io.github.fatalitaya.combatnexus.combat.api.action.CombatAction;
 import java.util.*;
 
 public record AbilitySnapshot(UUID execution, CombatAction action, AbilityGrant grant, AbilityTarget target,
-                              int step, Status status, List<CommandEvidence> commands, OptionalLong nextTick) {
+                              int step, Status status, List<CommandEvidence> commands, OptionalLong nextTick, Waiting waiting, int remainingInputs, Optional<CloseReason> closeReason) {
+    public enum Waiting { NONE, DELAY, INPUT }
+    public enum CloseReason { COMPLETED, EXPIRED, CANCELLED, SOURCE_REMOVED, LIFECYCLE, FAILED }
     public enum Status { RUNNING, WAITING, COMPLETED, REJECTED, CANCELLED, PARTIAL, UNKNOWN }
     /** Detached domain evidence, without retaining DamageRequest's native entities. */
     public record CommandEvidence(Optional<CommandContext> context, boolean applied,
@@ -16,6 +18,8 @@ public record AbilitySnapshot(UUID execution, CombatAction action, AbilityGrant 
     public AbilitySnapshot {
         Objects.requireNonNull(execution); Objects.requireNonNull(action); Objects.requireNonNull(grant);
         Objects.requireNonNull(target); Objects.requireNonNull(status); commands=List.copyOf(commands); Objects.requireNonNull(nextTick);
+        Objects.requireNonNull(waiting);Objects.requireNonNull(closeReason);
+        if(remainingInputs<0||remainingInputs>63)throw new IllegalArgumentException("Invalid remaining inputs");
         if (step<0 || step>64 || commands.size()>256) throw new IllegalArgumentException("Ability execution budget exceeded");
     }
 }

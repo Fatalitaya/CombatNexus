@@ -13,18 +13,23 @@ parser.add_argument('--port', type=int, default=25590)
 parser.add_argument('--definitions', action='store_true', help='Also exercise aggregate datapack adoption in the disposable world')
 parser.add_argument('--definitions-only', action='store_true')
 parser.add_argument('--run-directory', type=Path, default=ROOT / 'targets/neoforge-26.1.2/build/boundary-run')
+parser.add_argument("--target", choices=["neoforge-26.1.2", "neoforge-1.21.1"], default="neoforge-26.1.2")
 args = parser.parse_args()
+import importlib.util
+spec = importlib.util.spec_from_file_location("runtime", ROOT / "scripts/verify-capabilities-runtime.py")
+runtime = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runtime)
+runtime.TARGET = ROOT / "targets" / args.target
 
 
 def run(script):
-    result = subprocess.run([sys.executable, str(ROOT / 'scripts/run-autojs.py'), str(script),
-                             '--port', str(args.port), '--timeout-ms', '30000'], text=True, capture_output=True)
-    if result.returncode:
-        raise RuntimeError(result.stdout + result.stderr)
-    envelope = json.loads(result.stdout)
-    value = json.loads(envelope['value'])
+    code = runtime.read_script(script)
+    if args.target == "neoforge-1.21.1":
+        code = code.replace(',Java.loadClass("net.minecraft.world.entity.EntitySpawnReason").COMMAND', '').replace('.hurtServer(level,', '.hurt(')
+    value = runtime.evaluate(args.port, code)
     print(json.dumps({'script': str(script.relative_to(ROOT)), **value}, ensure_ascii=False))
     return value
+
 
 
 deadline = time.monotonic() + 30
@@ -39,7 +44,7 @@ for name in ('verify-ownership-boundaries', 'verify-domain-pipelines', 'verify-c
 if args.definitions:
     pack_root = args.run_directory / 'world/datapacks'
     assert pack_root.is_dir(), 'Use the disposable server.init.gradle world'
-    scripts = ROOT / 'targets/neoforge-26.1.2/build/verification'
+    scripts = ROOT / 'targets' / args.target / 'build/verification'
     scripts.mkdir(parents=True, exist_ok=True)
     probe = scripts / 'behavior-reload-probe.js'
 
@@ -58,7 +63,7 @@ if args.definitions:
         assert pack.is_relative_to(pack_root.resolve())
         name = 'file/' + pack.name
         (pack / 'pack.mcmeta').write_text(json.dumps({'pack': {'description': 'Behavior definition verification',
-                                                            'min_format': [101, 1], 'max_format': [101, 1]}}))
+                                                            **({'pack_format': 48} if args.target == 'neoforge-1.21.1' else {'min_format': [101, 1], 'max_format': [101, 1]})}}))
         directory = pack / 'data/combatnexus/combatnexus_behaviors'
         directory.mkdir(parents=True)
         sample = json.loads((ROOT / 'common/src/main/resources/data/combatnexus/combatnexus_behaviors/periodic_healing.json').read_text())
@@ -67,6 +72,8 @@ if args.definitions:
         domain_files = {}
         for domain, filename in [('healing_rules', 'example_healing'), ('regeneration', 'field_recovery'), ('shields', 'physical_guard'), ('effects', 'agility')]:
             original_file = ROOT / f'common/src/main/resources/data/combatnexus/combatnexus_{domain}/{filename}.json'
+            if not original_file.exists():
+                original_file = ROOT / 'targets' / args.target / f'src/main/resources/data/combatnexus/combatnexus_{domain}/{filename}.json'
             target_file = pack / f'data/combatnexus/combatnexus_{domain}/verification.json'
             target_file.parent.mkdir(parents=True, exist_ok=True)
             target_file.write_text(original_file.read_text(), encoding='utf-8')

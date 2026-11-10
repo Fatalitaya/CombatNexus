@@ -103,9 +103,9 @@
         var panel=capture();
         check(panel!==null,"owner projection delivers authoritative snapshot");
         var Projector=cls("presentation.api.CombatPanelProjector");
-        check(String(Projector.supplement(capture(),now))===String(Projector.supplement(panel,now)),"same-tick projection is stable without advancing lifecycle");
+        check(String(Projector.project(capture(),now,function(e){return world.timeControl().advancing(e.target(),e.source().orElse(e.definition()));}))===String(Projector.project(panel,now,function(e){return world.timeControl().advancing(e.target(),e.source().orElse(e.definition()));})),"same-tick projection is stable without advancing lifecycle");
         rejects(function(){world.panel(entity,snapshot,function(){throw new Error("projection budget");});},"projection budget cannot be bypassed");
-        check(String(Projector.supplement(capture(),now))===String(Projector.supplement(panel,now)),"failed projection budget preserves authoritative state");
+        check(String(Projector.project(capture(),now,function(e){return world.timeControl().advancing(e.target(),e.source().orElse(e.definition()));}))===String(Projector.project(panel,now,function(e){return world.timeControl().advancing(e.target(),e.source().orElse(e.definition()));})),"failed projection budget preserves authoritative state");
     } finally {
         failApply=false; failCompensation=false;
         try {

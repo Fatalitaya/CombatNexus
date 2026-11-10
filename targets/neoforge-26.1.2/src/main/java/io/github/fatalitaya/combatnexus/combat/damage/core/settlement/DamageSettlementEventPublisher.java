@@ -39,6 +39,14 @@ public final class DamageSettlementEventPublisher {
                      DamageSettlementDispatchScope.openObservation(
                              completion.snapshot(),
                              completion.serverSession())) {
+            if (completion.snapshot().itemBlocked()) {
+                var block = completion.snapshot().evidence().itemBlock().orElseThrow();
+                io.github.fatalitaya.combatnexus.combat.spi.CombatMomentAccess.publish(live.level(),
+                    new io.github.fatalitaya.combatnexus.combat.api.action.CombatMoment.ItemBlock(
+                        completion.snapshot().target().entity(),
+                        completion.snapshot().logicalAttacker().map(io.github.fatalitaya.combatnexus.combat.api.transaction.ParticipantIdentity::entity),
+                        block.item(), block.blocked()));
+            }
             dispatch(
                     completion.snapshot().lineage().damageId(),
                     () -> dispatchObserver.accept(completion.snapshot())

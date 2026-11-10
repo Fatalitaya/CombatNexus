@@ -10,4 +10,5 @@ public interface EntityMotionAccess {
     void fireTicks(UUID target, int ticks);
     Vector3 vector(UUID target, Mode mode);
     void vector(UUID target, Mode mode, Vector3 value);
+    void knockback(UUID target, double strength, double x, double z);
 }

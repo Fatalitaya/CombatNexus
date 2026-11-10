@@ -8,18 +8,21 @@ import urllib.request
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--server-port", type=int, default=25590)
 parser.add_argument("--client-port", type=int, default=25591)
+parser.add_argument("--target", choices=["neoforge-26.1.2", "neoforge-1.21.1"], default="neoforge-26.1.2")
 args = parser.parse_args()
 
+import importlib.util
+spec = importlib.util.spec_from_file_location("runtime", Path(__file__).with_name("verify-capabilities-runtime.py"))
+runtime = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runtime)
+
 def evaluate(side, code):
-    port = args.server_port if side == "server" else args.client_port
-    request = urllib.request.Request(f"http://127.0.0.1:{port}/mcp", json.dumps({"jsonrpc":"2.0", "id":1,
-        "method":"tools/call", "params":{"name":"eval_js", "arguments":{"side":side,"code":code,"timeout_ms":10000}}}).encode(),
-        {"Content-Type":"application/json"})
-    with urllib.request.urlopen(request, timeout=20) as response: envelope = json.load(response)
-    assert "error" not in envelope, envelope
-    result = json.loads(envelope["result"]["content"][0]["text"])
-    assert result.get("ok") and not result.get("diagnostics"), result
-    return json.loads(result["value"])
+    if args.target == "neoforge-1.21.1":
+        code = code.replace('p.input.keyPresses=new (Java.loadClass("net.minecraft.world.entity.player.Input"))(true,true,true,true,true,false,true);',
+                            'p.input.up=true;p.input.down=true;p.input.left=true;p.input.right=true;p.input.jumping=true;p.input.forwardImpulse=1;p.input.leftImpulse=1;')
+        code = code.replace('var keys=p.input.keyPresses;', 'var keys=p.input;').replace('keys.forward()', 'keys.up').replace('keys.backward()', 'keys.down').replace('keys.left()', 'keys.left').replace('keys.right()', 'keys.right').replace('keys.jump()', 'keys.jumping')
+        code = code.replace('p.onGround(),false)', 'p.onGround())')
+    return runtime.evaluate(args.client_port if side == "client" else args.server_port, code, side=side)
 
 prefix = 'function cls(n){return Java.loadClass("io.github.fatalitaya.combatnexus."+n);}'
 server = prefix + '''var level=AutoJS.server().overworld(),p=AutoJS.server().getPlayerList().getPlayerByName("SettingsVerifier");
@@ -79,7 +82,7 @@ while True:
     time.sleep(.1)
 checks.append("removal releases all client controls through network update")
 report = {"passed":len(checks), "checks":checks}
-output = Path(__file__).resolve().parents[1]/"targets/neoforge-26.1.2/build/verification/isolated/control-client.json"
+output = Path(__file__).resolve().parents[1]/("targets/"+args.target+"/build/verification/isolated/control-client.json")
 output.parent.mkdir(parents=True, exist_ok=True)
 output.write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report, indent=2))

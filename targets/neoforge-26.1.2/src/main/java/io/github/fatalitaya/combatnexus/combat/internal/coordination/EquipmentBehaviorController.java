@@ -22,6 +22,10 @@ public final class EquipmentBehaviorController {
  private final CombatRuntime world;private final EquipmentObservation observations;
  private final Map<UUID,Map<EquipmentSelection.Key,Installed>> installed=new LinkedHashMap<>();
  private final Map<UUID,EquipmentSelection> selections=new HashMap<>();
+ private record Observation(io.github.fatalitaya.combatnexus.combat.api.transaction.ParticipantIdentity identity, long generation, Map<EquipmentPosition,EquipmentItem> items) {}
+ private record Resolved(Observation observation, EquipmentSelection selection) {}
+ private final Map<UUID,Resolved> resolved = new HashMap<>();
+ private final Map<UUID,Observation> completed = new HashMap<>();
  private final Set<UUID> tracked=new LinkedHashSet<>();
  public EquipmentBehaviorController(CombatRuntime world,EquipmentObservation observations){this.world=world;this.observations=Objects.requireNonNull(observations);}
  public void track(UUID target){CombatMutationGuard.requireWorldWritePhase();if(tracked.size()>=4096&&!tracked.contains(target))throw new IllegalStateException("Equipment target budget exceeded");tracked.add(target);}
@@ -35,16 +39,22 @@ public final class EquipmentBehaviorController {
   if(handle.isPresent()&&!world.sourceInstallations().revoke(UUID.randomUUID(),handle.get()).applied())return false;
   value.contributions.remove(id);return true;
  }
+ public void invalidate(UUID target) { completed.remove(target); }
  public void changed(UUID target,EquipmentPosition slot,EquipmentItem current){track(target);refresh(target,Map.of(slot,current));}
  private void refresh(UUID target,Map<EquipmentPosition,EquipmentItem> overrides){
   CombatMutationGuard.requireWorldWritePhase();if(!observations.alive(target))return;
   var observed=new EnumMap<EquipmentPosition,EquipmentItem>(EquipmentPosition.class);
   for(var slot:EquipmentPosition.values())observations.item(target,slot).ifPresent(item->observed.put(slot,overrides.getOrDefault(slot,item)));
-  var desired=EquipmentSelection.resolve(observed,world.definitions());
+  var observation = new Observation(world.participantIdentity(target).orElseThrow(), world.definitions().generation(), Map.copyOf(observed));
+  if (observation.equals(completed.get(target))) return;
+  completed.remove(target);
+  var cached = resolved.get(target);
+  var desired = cached != null && cached.observation().equals(observation) ? cached.selection() : EquipmentSelection.resolve(observed,world.definitions());
+  resolved.put(target, new Resolved(observation, desired));
   boolean reloaded=selections.containsKey(target)&&selections.get(target).generation()!=desired.generation();
   var ledger=installed.computeIfAbsent(target,ignored->new LinkedHashMap<>());
   var candidates=new LinkedHashMap<EquipmentSelection.Key,EquipmentSelection.Candidate>();desired.candidates().forEach(c->candidates.put(c.key(),c));
-  var confirmed=new LinkedHashSet<EquipmentSelection.Key>();RuntimeException failure=null;
+  var confirmed=new LinkedHashSet<EquipmentSelection.Key>();RuntimeException failure=null;boolean reconciled=true;
   for(var entry:List.copyOf(ledger.entrySet())){
    var candidate=candidates.get(entry.getKey());var value=entry.getValue();
    if(candidate==null||!value.item.equals(candidate.item())||(!value.binding.equals(candidate.definition().binding())&&(!reloaded||value.binding.kind()!=candidate.definition().binding().kind()))){
@@ -85,11 +95,13 @@ public final class EquipmentBehaviorController {
      complete&=world.sourceInstallations().install(new SourceInstallation(UUID.randomUUID(),target,origin,entry.getValue())).applied();
     }
    }
+   if (!complete) reconciled=false;
    value.selected=selected&&complete;
    if(value.selected)confirmed.add(key);
   }
   selections.put(target,new EquipmentSelection(desired.generation(),desired.candidates().stream().map(c->new EquipmentSelection.Candidate(c.key(),c.item(),c.definition(),ledger.containsKey(c.key())?ledger.get(c.key()).installation:null)).toList(),confirmed));
   if(failure!=null)throw failure;
+  if (reconciled) completed.put(target, observation);
  }
  private static boolean sameParts(SourcePlan before,SourcePlan after){return before.effects().keySet().equals(after.effects().keySet())&&before.shields().keySet().equals(after.shields().keySet())&&before.regeneration().keySet().equals(after.regeneration().keySet())&&before.abilities().equals(after.abilities());}
  private static SourcePlan provenance(SourcePlan plan,UUID target,EquipmentSelection.Candidate candidate){
@@ -97,7 +109,7 @@ public final class EquipmentBehaviorController {
   plan.effects().forEach((id,e)->effects.put(id,new io.github.fatalitaya.combatnexus.effect.api.EffectDefinition(e.level(),e.lifetime(),e.stacking(),e.policy(),e.attributes(),e.behavior(),e.restrictions(),e.display().withProvenance(new SourceProvenance(target,candidate.item(),candidate.key().slot(),null,null)))));
   return new SourcePlan(plan.definition(),effects,plan.regeneration(),plan.shields(),plan.abilities(),plan.persistent());
  }
- public EquipmentSelection selection(UUID target){return selections.getOrDefault(target,new EquipmentSelection(world.definitions().generation(),List.of(),Set.of()));}
+ public EquipmentSelection selection(UUID target){var current=selections.get(target);return current!=null?current:new EquipmentSelection(world.definitions().generation(),List.of(),Set.of());}
  public void tick(long generation){CombatMutationGuard.requireWorldWritePhase();for(var target:List.copyOf(tracked))try{refresh(target,Map.of());}catch(RuntimeException failure){/* Retain ownership and retry on the next lifecycle opportunity. */}}
  public record EquipmentView(UUID installation, EquipmentPosition slot, NexusId binding, NexusId definition, boolean selected) {}
  public List<EquipmentView> projection(UUID target) {
@@ -125,6 +137,6 @@ public final class EquipmentBehaviorController {
   track(target);return sources(target);
  }
  public void restored(UUID target){refresh(target,Map.of());}
- public void clear(UUID target){tracked.remove(target);installed.remove(target);selections.remove(target);}
- public void close(){tracked.clear();installed.clear();selections.clear();}
+ public void clear(UUID target){observations.clear(target);tracked.remove(target);installed.remove(target);selections.remove(target);completed.remove(target);resolved.remove(target);}
+ public void close(){observations.close();tracked.clear();installed.clear();selections.clear();completed.clear();resolved.clear();}
 }

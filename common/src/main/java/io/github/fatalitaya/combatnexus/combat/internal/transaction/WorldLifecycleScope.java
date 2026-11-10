@@ -6,8 +6,9 @@ public final class WorldLifecycleScope {
     private WorldLifecycleScope() {}
     static void run(Runnable action) {
         int before = DEPTH.get() == null ? 0 : DEPTH.get(); DEPTH.set(before + 1);
-        try { action.run(); } finally { if (before == 0) DEPTH.remove(); else DEPTH.set(before); }
+        try { action.run(); } finally { if (before == 0) DEPTH.remove(); else DEPTH.set(before); CombatCompletionQueue.drainIfSafe(); }
     }
+    public static boolean active() { return DEPTH.get() != null; }
     public static void requireIdleOrLifecycle() {
         if (CombatExecutionScope.isActive() && DEPTH.get() == null)
             throw new IllegalStateException("World lifecycle mutation requires kernel authority");

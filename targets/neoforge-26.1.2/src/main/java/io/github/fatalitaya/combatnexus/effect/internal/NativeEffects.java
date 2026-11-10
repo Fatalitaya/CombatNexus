@@ -20,6 +20,10 @@ public final class NativeEffects {
         boolean accepted;
         try {
             accepted = command.operation() == NativeEffectCommand.Operation.REMOVE ? target.removeEffect(effect)
+                    : command.operation()==NativeEffectCommand.Operation.FORCE_APPLY
+                    ? io.github.fatalitaya.combatnexus.effect.platform.NativeEffectBridge.addForced(target,
+                        new MobEffectInstance(effect,command.durationTicks(),command.amplifier(),command.ambient(),command.visible(),command.icon()),
+                        command.source().owner().map(((net.minecraft.server.level.ServerLevel)target.level())::getEntity).orElse(null))
                     : target.addEffect(new MobEffectInstance(effect, command.durationTicks(), command.amplifier(), command.ambient(), command.visible(), command.icon()),
                             command.source().owner().map(((net.minecraft.server.level.ServerLevel)target.level())::getEntity).orElse(null));
         } catch (RuntimeException failure) {

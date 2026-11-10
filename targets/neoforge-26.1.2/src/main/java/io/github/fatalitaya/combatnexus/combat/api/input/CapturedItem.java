@@ -17,7 +17,11 @@ public final class CapturedItem implements RuleItemView {
     public CapturedItem(ItemStack stack) {this(stack,CombatItems.defaults(stack));}
     public CapturedItem(ItemStack stack,CombatItemBindingSpec defaults){this(stack,defaults,Optional.empty(),Optional.empty());}
     public CapturedItem(ItemStack stack,CombatItemBindingSpec defaults,Optional<List<EntryDefinition>> entries,Optional<List<AffixDefinition>> affixes){
-        this.stack=Objects.requireNonNull(stack).copy();this.defaults=Objects.requireNonNull(defaults);this.selectedEntries=entries.map(List::copyOf);this.selectedAffixes=affixes.map(List::copyOf);
+        this.stack=Objects.requireNonNull(stack).copy();
+        if (entries.isPresent() || affixes.isPresent()) {
+            this.stack.remove(io.github.fatalitaya.combatnexus.combat.platform.CombatDataComponents.PATCH.get());
+            this.stack.remove(io.github.fatalitaya.combatnexus.combat.platform.CombatDataComponents.BINDINGS.get());
+        }this.defaults=Objects.requireNonNull(defaults);this.selectedEntries=entries.map(List::copyOf);this.selectedAffixes=affixes.map(List::copyOf);
     }
     public boolean isEmpty() { return stack.isEmpty(); }
     public NexusId itemId() { return io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().itemId(stack.getItem()); }

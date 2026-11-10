@@ -55,17 +55,18 @@ public final class AbilityExtension {
             TARGETS.add(target.entity()); if(TARGETS.size()>256)TARGETS.removeFirst();
             execution.submit(new DomainCommand.Heal(new HealingRequest(UUID.randomUUID(),target.entity(),healingSourceOverride == null ? execution.source() : healingSourceOverride,HealingRequest.Reason.SKILL,amount)));
         }
+        execution.released();
     }
     private static AbilityExecutor healer() {
         return new AbilityExecutor(new AbilityExecutorSpec(Set.of(AbilityTarget.Kind.SELF,AbilityTarget.Kind.ENTITY,AbilityTarget.Kind.ENTITIES),Set.of(CombatOperation.HEALING),1),
-            input->true,execution->{observe(execution);heal(execution,execution.input().definition().parameters().number("amount"));return Optional.empty();});
+            input->true,execution->{observe(execution);heal(execution,execution.input().definition().parameters().number("amount"));return new AbilityStepResult.Complete();});
     }
     private static AbilityDefinition definition(String path,String executor,Set<AbilityTarget.Kind> targets,int cooldown,Optional<NexusId> shared,AbilityTrigger trigger) {
         return new AbilityDefinition(id(path),path,"Ability verification content",targets,id(executor),
-            new AbilityParameters(Map.of("amount",3.0),Map.of()),cooldown,shared,trigger);
+            new AbilityParameters(Map.of("amount",3.0),Map.of()),cooldown,shared,shared.isPresent()?cooldown:0,AbilityDefinition.CooldownOwner.SOURCE_CONTRIBUTION,AbilityDefinition.CooldownStart.ADMISSION,AbilityDefinition.DeathCooldown.RETAIN,trigger);
     }
     public static void register(CombatRegistrar api) {
-        registrar=api;
+        registrar=api;GenericCombatExtension.register(api);
         api.abilityExecutor(id("heal_executor"),healer());
         api.abilityExecutor(id("combo_executor"),new AbilityExecutor(new AbilityExecutorSpec(Set.of(AbilityTarget.Kind.ENTITY,AbilityTarget.Kind.ENTITIES),Set.of(CombatOperation.DAMAGE,CombatOperation.EFFECT),1),
             input->true,execution->{
@@ -76,12 +77,12 @@ public final class AbilityExtension {
                     var effect=ManagedEffects.agility(target.entity(),execution.source().id(),0.1,Math.addExact(execution.businessTick(target.entity(),execution.source().id()),40));
                     execution.submit(new DomainCommand.ManagedEffect(new EffectApplication(UUID.randomUUID(),effect,EffectService.Stacking.REPLACE)));
                 }
-                return Optional.empty();
+                return new AbilityStepResult.Complete();
             }));
         api.abilityExecutor(id("delayed_executor"),new AbilityExecutor(healer().spec(),input->true,execution->{
             observe(execution);
-            if(execution.step()==0)return Optional.of(new AbilityContinuation(5,new AbilityParameters(Map.of("amount",4.0),Map.of())));
-            heal(execution,execution.state().number("amount"));return Optional.empty();
+            if(execution.step()==0)return new AbilityStepResult.Delay(new AbilityContinuation(5,new AbilityParameters(Map.of("amount",4.0),Map.of())));
+            heal(execution,execution.state().number("amount"));return new AbilityStepResult.Complete();
         }));
         api.abilityExecutor(id("partial_executor"),new AbilityExecutor(healer().spec(),input->true,execution->{
             observe(execution);heal(execution,1);throw new IllegalStateException("Intentional failure after confirmed healing");

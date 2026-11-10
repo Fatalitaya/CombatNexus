@@ -11,6 +11,7 @@ public record EffectInstance(EffectSnapshot snapshot, List<AttributeContribution
             io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorPlan behavior, EffectPolicy policy, List<EffectInstance> hidden, EffectDisplay display) {
         this(snapshot, attributes, ownership, behavior, policy, hidden, display, EffectService.Stacking.REPLACE.id());
     }
+    public EffectInstance withApplication(EffectApplicationPolicy application){return new EffectInstance(snapshot,attributes,ownership,behavior,policy.withApplication(application),hidden,display,stacking);}
     public EffectInstance withStacking(NexusId strategy) { return new EffectInstance(snapshot, attributes, ownership, behavior, policy, hidden, display, strategy); }
     public EffectInstance(EffectSnapshot snapshot, List<AttributeContribution> attributes, EffectOwnership ownership,
             io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorPlan behavior, EffectPolicy policy, List<EffectInstance> hidden) {

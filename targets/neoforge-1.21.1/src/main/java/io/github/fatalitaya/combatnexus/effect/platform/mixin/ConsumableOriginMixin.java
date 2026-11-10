@@ -1,0 +1,24 @@
+package io.github.fatalitaya.combatnexus.effect.platform.mixin;
+
+import io.github.fatalitaya.combatnexus.platform.NativeIds;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import io.github.fatalitaya.combatnexus.combat.api.source.SourceProvenance;
+import io.github.fatalitaya.combatnexus.combat.platform.EquipmentCombatAdapter;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+
+import net.minecraft.world.level.Level;
+import org.spongepowered.asm.mixin.Mixin;
+
+@Mixin(ItemStack.class)
+public abstract class ConsumableOriginMixin {
+    @WrapMethod(method = "finishUsingItem")
+    private ItemStack combatnexus$origin(Level level, LivingEntity user, Operation<ItemStack> original) {
+        ItemStack stack = (ItemStack)(Object)this;
+        if (level.isClientSide()) return original.call(level, user);
+        var provenance = new SourceProvenance(user.getUUID(), NativeIds.nexus(BuiltInRegistries.ITEM.getKey(stack.getItem())), null, null, null);
+        return EquipmentCombatAdapter.effectOrigins().invoke(user, provenance, () -> original.call(level, user));
+    }
+}

@@ -71,7 +71,7 @@
    var boundInstall=api.sources().install(new (cls("combat.api.source.SourceInstallation"))(UUID.randomUUID(),actor.getUUID(),boundSource,boundPlan),restoredBinding);
    check(boundInstall.applied(),"restored binding installs a real source and grant");
    var boundGrant=service.grants(actor.getUUID()).stream().filter(function(g){return g.source().equals(boundSource);}).findFirst().orElseThrow();
-   var reload=function(change){var domains=published.domains();if(change){var values=new (Java.loadClass("java.util.HashMap"))(domains.abilities()),old=values.get(id("ability_heal"));values.put(old.id(),new (cls("combat.ability.api.AbilityDefinition"))(old.id(),old.title(),old.description(),old.targets(),old.executor(),new Params(Map.of("amount",7.0),Map.of()),old.cooldownTicks(),old.sharedCooldown(),old.trigger()));domains=new (cls("combat.api.DomainDefinitions"))(domains.healingRules(),domains.regeneration(),domains.shields(),domains.effects(),values);}Definitions.publish(kernel,new Generation(Definitions.nextGeneration(),published.settings(),published.damage(),published.behaviors(),domains,published.itemBindings()));};
+   var reload=function(change){var domains=published.domains();if(change){var values=new (Java.loadClass("java.util.HashMap"))(domains.abilities()),old=values.get(id("ability_heal"));values.put(old.id(),new (cls("combat.ability.api.AbilityDefinition"))(old.id(),old.title(),old.description(),old.targets(),old.executor(),new Params(Map.of("amount",7.0),Map.of()),old.cooldownTicks(),old.sharedCooldown(),old.sharedCooldownTicks(),old.cooldownOwner(),old.cooldownStart(),old.deathCooldown(),old.trigger()));domains=new (cls("combat.api.DomainDefinitions"))(domains.healingRules(),domains.regeneration(),domains.shields(),domains.effects(),values);}Definitions.publish(kernel,new Generation(Definitions.nextGeneration(),published.settings(),published.damage(),published.behaviors(),domains,published.itemBindings()));};
    reload(true);check(!service.evaluate(req(periodic,self)).available(),"successful generation publication invalidates old grant");changed(NS.MAINHAND,actor.getMainHandItem());
    one.setHealth(1);var boundResult=service.execute(req(boundGrant));
    check(boundResult.receipt().applied()&&one.getHealth()===4,"bound grant executes original semantics after latest generation changes");
@@ -115,6 +115,19 @@
    for(var handle of installedBindings)api.sources().revoke(UUID.randomUUID(),handle);
    bindingDefinitions.publish(bindingKernel,new bindingGeneration(bindingDefinitions.nextGeneration(),bindingBase.settings(),bindingBase.damage(),bindingBase.behaviors(),bindingBase.domains(),bindingBase.itemBindings()));
   }
+  var stateAddress=new (cls("combat.state.api.StateAddress"))(actor.getUUID(),Java.loadClass("probe.PlanExample").RETAINED_STATE,Optional.empty());
+  var stateSource=new (cls("combat.api.CombatSource"))(id("state_consumption"),Optional.empty(),Optional.empty()),states=api.states();
+  check(states.take(UUID.randomUUID(),stateAddress,stateSource).value().orElseThrow().isEmpty(),"taking absent state succeeds with empty value");
+  check(states.write(UUID.randomUUID(),stateAddress,stateSource,Java.loadClass("java.lang.Integer").valueOf(7)).applied(),"state write admitted");
+  var takeId=UUID.randomUUID(),taken=states.take(takeId,stateAddress,stateSource);
+  check(taken.applied()&&taken.value().orElseThrow().orElseThrow().intValue()===7&&states.read(stateAddress).isEmpty(),"take returns value and removes it atomically");
+  states.write(UUID.randomUUID(),stateAddress,stateSource,Java.loadClass("java.lang.Integer").valueOf(9));
+  check(String(states.take(takeId,stateAddress,stateSource).rejection().orElseThrow().code())==="DUPLICATE"&&states.read(stateAddress).orElseThrow().intValue()===9,"duplicate take does not consume replacement state");
+  var readonly=cls("combat.api.transaction.CombatReadScope").open();
+  try {check(String(states.take(UUID.randomUUID(),stateAddress,stateSource).rejection().orElseThrow().code())==="INVALID_PHASE","take rejects read-only computation");}
+  finally {readonly.close();}
+  check(states.read(stateAddress).orElseThrow().intValue()===9,"rejected take leaves state intact");
+  check(states.remove(UUID.randomUUID(),stateAddress,stateSource).applied()&&states.read(stateAddress).isEmpty(),"remove remains available after rejected take");
   return JSON.stringify({passed:checks.length,checks:checks});
  } finally {for(var e of entities){Life.clear(world,e.getUUID(),cls("effect.api.EffectService$Removal").WORLD_EXIT);e.discard();}}
 })();

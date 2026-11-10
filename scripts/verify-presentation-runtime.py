@@ -75,7 +75,7 @@ finally:
 reopen()
 normal = wait_for(rows_code, lambda state: len(state['rows']) > 1)
 checks.append('removing excess sources restores the panel')
-mirror_code = '(function(){var mc=Java.loadClass("net.minecraft.client.Minecraft").getInstance(),m=Java.loadClass("io.github.fatalitaya.combatnexus.presentation.platform.client.ClientEntityCombatMirrors").snapshot(mc.player).orElseThrow();return JSON.stringify({revision:m.revision(),receivedAt:String(m.receivedAt()),data:String(m.data())});})()'
+mirror_code = '(function(){var mc=Java.loadClass("net.minecraft.client.Minecraft").getInstance(),m=Java.loadClass("io.github.fatalitaya.combatnexus.presentation.platform.client.ClientEntityCombatMirrors").snapshot(mc.player).orElseThrow();return JSON.stringify({subscription:String(m.subscription()),revision:m.revision(),receivedAt:String(m.receivedAt()),data:String(m.data())});})()'
 for attempt in range(5):
     stable_before = evaluate(mirror_code, True)
     time.sleep(1.1)
@@ -93,11 +93,11 @@ evaluate('''(function(){''' + server_prefix + '''
     var root="io.github.fatalitaya.combatnexus.",level=player.level();
     var runtime=Java.loadClass(root+"combat.internal.platform.PlatformWorldLifecycle").existing(level);
     var Payload=Java.loadClass(root+"presentation.platform.network.CombatPresentationPayload");
-    var payload=new Payload(runtime.sessionId(),Java.loadClass(root+"platform.NativeIds").nexus(level.dimension().identifier()),
+    var payload=new Payload(Java.loadClass("java.util.UUID").fromString("SUBSCRIPTION"),runtime.sessionId(),Java.loadClass(root+"platform.NativeIds").nexus(level.dimension().identifier()),
         runtime.serverRuntime().definitions().orElseThrow().generation(),player.getId(),player.getUUID(),player.combatnexus$incarnation(),0,false,
         '{"status":"refused","reason":"STALE_REPLY"}');
     Java.loadClass("net.neoforged.neoforge.network.PacketDistributor").sendToPlayer(player,payload);
-    return JSON.stringify({sent:true});})()''')
+    return JSON.stringify({sent:true});})()'''.replace("SUBSCRIPTION", evaluate(mirror_code, True)["subscription"]))
 time.sleep(.3)
 assert not any('STALE_REPLY' in text for text in evaluate(rows_code, True)['rows'])
 checks.append('stale mirror revision cannot replace the visible snapshot')

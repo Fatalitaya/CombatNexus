@@ -64,7 +64,8 @@ public final class DamageSettlementCallback {
 
     /**
      * Returns authority for independent derived requests only during this
-     * exact callback invocation. NOT_APPLIED settlements return empty.
+     * exact callback invocation. Completed item blocks may grant authority even
+     * when damage is NOT_APPLIED; other NOT_APPLIED settlements return empty.
      */
     public Optional<DamageParentRef> childAuthority() {
         DamageParentRef candidate = authority;

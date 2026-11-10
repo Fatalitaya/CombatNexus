@@ -18,7 +18,7 @@ public final class EffectFactProjection {
             if (managed.stream().anyMatch(e -> effect.id().equals(e.effect().display().nativeId()))) continue;
             merged.add(new EffectView(target, effect.id(), Optional.empty(), Optional.empty(), io.github.fatalitaya.combatnexus.effect.api.EffectOwnership.VANILLA_OBSERVED,
                 Set.of(effect.category()), effect.amplifier(), effect.remainingTicks(), Optional.empty(),
-                EffectView.Completeness.UNKNOWN_SOURCE, Set.of(EffectView.Operation.DISPEL), SourceProvenance.UNKNOWN));
+                EffectView.Completeness.UNKNOWN_SOURCE, Set.of(EffectView.Operation.DISPEL), SourceProvenance.UNKNOWN,EffectControl.NONE,EffectApplicationPolicy.NORMAL));
         }
         for (var entry : managed) {
             var effect = entry.effect();
@@ -31,7 +31,7 @@ public final class EffectFactProjection {
                     : OptionalLong.of(Math.max(0, state.expiresAtTick().getAsLong() - time.now(target, state.source()))),
                 Optional.ofNullable(effect.display().owner()).or(() -> identity.flatMap(SourceInstance::owner)),
                 identity.isPresent() || !effect.display().provenance().equals(SourceProvenance.UNKNOWN) ? EffectView.Completeness.COMPLETE : EffectView.Completeness.UNKNOWN_SOURCE,
-                effect.policy().dispellable() ? Set.of(EffectView.Operation.DISPEL) : Set.of(), effect.display().provenance()));
+                effect.policy().dispellable() ? Set.of(EffectView.Operation.DISPEL) : Set.of(), effect.display().provenance(),effect.policy().control(),effect.policy().application()));
         }
         return new EffectFacts(effects, merged);
     }

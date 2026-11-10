@@ -50,6 +50,12 @@ public final class DamageSettlementState {
     private boolean healthWriteObserved;
     private float confirmedHealthLoss;
     private double shieldLoss;
+    private io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt itemBlock;
+    void recordItemBlock(io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt receipt) {
+        requirePhase(DamageSettlementPhase.CALCULATED, "record item block");
+        if (itemBlock != null) throw new IllegalStateException("Duplicate item block");
+        itemBlock = Objects.requireNonNull(receipt);
+    }
     private final java.util.List<io.github.fatalitaya.combatnexus.combat.damage.api.damage.EquipmentDamageReceipt> equipment = new java.util.ArrayList<>();
     void recordEquipmentReceipt(io.github.fatalitaya.combatnexus.combat.damage.api.damage.EquipmentDamageReceipt receipt) {
         equipment.add(java.util.Objects.requireNonNull(receipt));
@@ -264,11 +270,19 @@ public final class DamageSettlementState {
     }
 
     DamageSettlementCompletion completeWithoutPost(boolean vanillaAccepted, boolean incomingCancelled) {
+        if (itemBlock != null) itemBlock = new io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt(
+                itemBlock.item(), itemBlock.hand(), itemBlock.incoming(), itemBlock.blocked(), itemBlock.remaining(), true);
         if (phase == DamageSettlementPhase.ADMISSION_REJECTED) {
             return completion;
         }
         if (phase == DamageSettlementPhase.APPLIED
                 || phase == DamageSettlementPhase.NOT_APPLIED) {
+            // Preserve Post resource deltas and freeze the completed item block only
+            // after the enclosing native hurt call returns.
+            var post = completion.snapshot();
+            completion = new DamageSettlementCompletion(snapshot(post.status(), post.reason().orElse(null),
+                    post.appliedDamage(), post.healthDamage(), post.absorptionDamage(),
+                    post.healthAfter(), post.absorptionAfter(), post.cancelled()), this);
             return completion;
         }
 
@@ -399,7 +413,7 @@ public final class DamageSettlementState {
         if (calculation == null) return io.github.fatalitaya.combatnexus.combat.damage.api.damage.DamageApplicationEvidence.NONE;
         return new io.github.fatalitaya.combatnexus.combat.damage.api.damage.DamageApplicationEvidence(
                         healthWriteObserved, confirmedHealthLoss, shieldLoss, calculation.reactionInputs(), applicationCompleted,
-                        new io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal(writes, applicationCompleted), calculation.behaviors(), calculation.action(), beforeResult, equipment);
+                        new io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal(writes, applicationCompleted), calculation.behaviors(), calculation.action(), beforeResult, equipment, java.util.Optional.ofNullable(itemBlock));
     }
 
     private void requirePhase(

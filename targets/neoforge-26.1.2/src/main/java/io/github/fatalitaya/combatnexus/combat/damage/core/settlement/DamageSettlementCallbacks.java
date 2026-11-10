@@ -62,7 +62,7 @@ public final class DamageSettlementCallbacks {
         }
 
         boolean grantsChildAuthority = snapshot.status()
-                == DamageSettlementStatus.APPLIED;
+                == DamageSettlementStatus.APPLIED || snapshot.itemBlocked();
         for (var entry : currentEntries) {
             DamageParentRef authority = grantsChildAuthority
                     ? createAuthorityForInvocation(completion.origin())

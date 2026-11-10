@@ -93,6 +93,7 @@ public final class SourceInstallations implements SourceService {
     }
     private void setSuspended(Installed value,boolean pause){
         var target=value.handle.target();
+        world.equipmentSourcesChanged(target);
         // Stop behavior first; it remains stopped if an attribute write needs reconciliation.
         if(pause)world.behaviorControl().suspend(target,key(value.source),true);
         world.effectControl().suspend(target,key(value.source),pause);
@@ -119,7 +120,7 @@ public final class SourceInstallations implements SourceService {
             for (var provider : io.github.fatalitaya.combatnexus.combat.internal.registration.CombatExtensions.sourceProviders()) {
                 Map<UUID, SourceProvider.Offer> offers = new LinkedHashMap<>();
                 try (var compute = io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.computation()) {
-                    var frame = new io.github.fatalitaya.combatnexus.combat.internal.WorldServices(world).facts(target).orElseThrow();
+                    var frame = world.services().facts(target).orElseThrow();
                     var values = List.copyOf(provider.listener().snapshot(frame));
                     if (values.size() > 64) throw new IllegalArgumentException("Source provider capacity exceeded");
                     for (var offer : values) {
@@ -248,6 +249,7 @@ public final class SourceInstallations implements SourceService {
             var key = new Key(handle.target(), handle.instance()); var value = installed.get(key);
             if (value == null || value.handle != handle || !handle.session().equals(world.sessionId()))
                 return CommandResult.rejected(CommandRejection.Code.STALE_HANDLE, "Installation handle is not current");
+            world.equipmentSourcesChanged(handle.target());
             try { cleanup(value, false); installed.remove(key); return CommandResult.applied(true); }
             catch (RuntimeException failure) {
                 value.pending = true;

@@ -15,7 +15,7 @@ public final class EntityApplication {
         var resource =
                 command instanceof EntityCommand.Ignite
                         ? ApplicationJournal.Resource.FIRE
-                        : ((EntityCommand.Displace) command).mode()
+                        : command instanceof EntityCommand.Displace displacement && displacement.mode()
                                         == EntityCommand.Displace.Mode.POSITION
                                 ? ApplicationJournal.Resource.POSITION
                                 : ApplicationJournal.Resource.VELOCITY;
@@ -33,6 +33,15 @@ public final class EntityApplication {
                                     access.fireTicks(target),
                                     Math.max(0, access.fireTicks(target) - before),
                                     true));
+                } else if (command instanceof EntityCommand.Knockback knockback) {
+                    var mode = EntityCommand.Displace.Mode.VELOCITY;
+                    var before = access.vector(target, mode);
+                    access.knockback(target, knockback.strength(), knockback.x(), knockback.z());
+                    var actual = access.vector(target, mode);
+                    writes.add(ApplicationJournal.Entry.write(resource, command.source().id(), before.x(), actual.x(), Math.abs(actual.x() - before.x()), true));
+                    writes.add(ApplicationJournal.Entry.write(resource, command.source().id(), before.y(), actual.y(), Math.abs(actual.y() - before.y()), true));
+                    writes.add(ApplicationJournal.Entry.write(resource, command.source().id(), before.z(), actual.z(), Math.abs(actual.z() - before.z()), true));
+                    return CommandResult.applied(!actual.equals(before)).withJournal(new ApplicationJournal(writes, true));
                 } else if (command instanceof EntityCommand.Displace movement) {
                     var before = access.vector(target, movement.mode());
                     var after = before.add(movement.delta());

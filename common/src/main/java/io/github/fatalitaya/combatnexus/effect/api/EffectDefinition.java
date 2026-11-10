@@ -49,9 +49,10 @@ public record EffectDefinition(int level, EffectLifetime lifetime, NexusId stack
     }
     public static EffectDefinition decode(JsonObject json, Map<NexusId, BehaviorDefinition> behaviors) {
         json = json.deepCopy();
+        if (!json.has("control")) json.add("control",EffectControl.NONE.encode());
         if (!json.has("tags")) json.add("tags", new com.google.gson.JsonArray());
         if (!json.has("display")) json.add("display", com.google.gson.JsonNull.INSTANCE);
-        SettingsJson.fields(json, "level", "lifetime", "stacking", "category", "dispellable", "attributes", "behaviors", "priority", "restrictions", "tags", "display");
+        SettingsJson.fields(json, "level", "lifetime", "stacking", "category", "dispellable", "attributes", "behaviors", "priority", "restrictions", "tags", "display", "control");
         var display = EffectDisplay.NONE;
         if (!json.get("display").isJsonNull()) {
             var value = SettingsJson.fields(json.getAsJsonObject("display"), "native_id", "ambient", "particles", "icon", "aggregate_sources", "persistent", "environment");
@@ -79,7 +80,7 @@ public record EffectDefinition(int level, EffectLifetime lifetime, NexusId stack
         return new EffectDefinition(SettingsJson.integer(json, "level"), EffectLifetime.decode(json.getAsJsonObject("lifetime")),
                 DefinitionJson.id(json, "stacking"),
                 new EffectPolicy(SettingsJson.enumeration(json, "category", EffectPolicy.Category.class), SettingsJson.bool(json, "dispellable"),
-                        json.has("tags") ? DefinitionJson.ids(json, "tags") : Set.of()),
+                        json.has("tags") ? DefinitionJson.ids(json, "tags") : Set.of(),json.has("control")?EffectControl.decode(json.getAsJsonObject("control")):EffectControl.NONE,EffectApplicationPolicy.NORMAL),
                 attributes, new BehaviorPlan(SettingsJson.integer(json, "priority"), components), restrictions, display);
     }
 }

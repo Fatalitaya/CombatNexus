@@ -19,8 +19,10 @@ public abstract class LivingControlMixin {
     }
     @Inject(method = "jumpFromGround", at = @At("HEAD"), cancellable = true)
     private void combatnexus$jump(CallbackInfo ci) { if (!CombatActionGate.allows((LivingEntity)(Object)this, JUMP)) ci.cancel(); }
-    @Inject(method = "knockback", at = @At("HEAD"), cancellable = true)
-    private void combatnexus$knockback(double power, double x, double z, CallbackInfo ci) {
-        if (!CombatActionGate.allows((LivingEntity)(Object)this, EXTERNAL_MOVEMENT)) ci.cancel();
+    @com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method = "knockback")
+    private void combatnexus$knockback(double power, double x, double z,
+            com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+        io.github.fatalitaya.combatnexus.combat.platform.NativeKnockback.enter(
+                (LivingEntity)(Object)this, power, x, z, () -> original.call(power, x, z));
     }
 }

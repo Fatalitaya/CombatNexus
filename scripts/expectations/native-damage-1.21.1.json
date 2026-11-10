@@ -1,0 +1,373 @@
+{
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.265",
+  "damage_types": [
+    {
+      "id": "minecraft:arrow",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:bad_respawn_point",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "explosion"
+      ]
+    },
+    {
+      "id": "minecraft:cactus",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:campfire",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:cramming",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:dragon_breath",
+      "channel": "combatnexus:magic",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:drown",
+      "channel": "combatnexus:untyped",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:dry_out",
+      "channel": "combatnexus:untyped",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:explosion",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "explosion"
+      ]
+    },
+    {
+      "id": "minecraft:fall",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:falling_anvil",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:falling_block",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:falling_stalactite",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:fireball",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:fireworks",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile",
+        "explosion"
+      ]
+    },
+    {
+      "id": "minecraft:fly_into_wall",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:freeze",
+      "channel": "combatnexus:cold",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:generic",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:generic_kill",
+      "channel": "combatnexus:untyped",
+      "managed": false,
+      "categories": []
+    },
+    {
+      "id": "minecraft:hot_floor",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:in_fire",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:in_wall",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:indirect_magic",
+      "channel": "combatnexus:magic",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:lava",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:lightning_bolt",
+      "channel": "combatnexus:lightning",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:magic",
+      "channel": "combatnexus:magic",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:mob_attack",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "melee"
+      ]
+    },
+    {
+      "id": "minecraft:mob_attack_no_aggro",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "melee"
+      ]
+    },
+    {
+      "id": "minecraft:mob_projectile",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:on_fire",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:out_of_world",
+      "channel": "combatnexus:untyped",
+      "managed": false,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:outside_border",
+      "channel": "combatnexus:untyped",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:player_attack",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "melee"
+      ]
+    },
+    {
+      "id": "minecraft:player_explosion",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "explosion"
+      ]
+    },
+    {
+      "id": "minecraft:sonic_boom",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:spit",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:stalagmite",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:starve",
+      "channel": "combatnexus:untyped",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:sting",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "melee"
+      ]
+    },
+    {
+      "id": "minecraft:sweet_berry_bush",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "environmental"
+      ]
+    },
+    {
+      "id": "minecraft:thorns",
+      "channel": "combatnexus:magic",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:thrown",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:trident",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:unattributed_fireball",
+      "channel": "combatnexus:fire",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:wind_charge",
+      "channel": "combatnexus:physical",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "minecraft:wither",
+      "channel": "combatnexus:wither",
+      "managed": true,
+      "categories": []
+    },
+    {
+      "id": "minecraft:wither_skull",
+      "channel": "combatnexus:wither",
+      "managed": true,
+      "categories": [
+        "projectile"
+      ]
+    },
+    {
+      "id": "neoforge:poison",
+      "channel": "combatnexus:poison",
+      "managed": true,
+      "categories": []
+    }
+  ]
+}

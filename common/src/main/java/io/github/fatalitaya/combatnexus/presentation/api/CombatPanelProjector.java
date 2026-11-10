@@ -2,13 +2,13 @@ package io.github.fatalitaya.combatnexus.presentation.api;
 
 import com.google.gson.*;
 
-/** Encodes supplemental facts; layout and native entity values remain client-owned. */
+/** Projects server-owned facts; the client only formats the captured values. */
 public final class CombatPanelProjector {
     private CombatPanelProjector() {}
     public static JsonObject refused(String reason) {
         var object = new JsonObject(); object.addProperty("status", "refused"); object.addProperty("reason", reason); return object;
     }
-    public static JsonObject supplement(CombatPanelSnapshot value, long now) {
+    public static JsonObject project(CombatPanelSnapshot value, long now, java.util.function.Predicate<io.github.fatalitaya.combatnexus.effect.api.EffectView> advancing) {
         var json = new JsonObject(); var budget = new PresentationBudget(256, 24000);
         var shields = new JsonArray();
         for (var shield : value.shields()) {
@@ -26,8 +26,12 @@ public final class CombatPanelProjector {
             row.addProperty("level", effect.level()); row.addProperty("ownership", effect.ownership().name());
             row.addProperty("completeness", effect.completeness().name());
             var tags = new JsonArray(); effect.tags().stream().sorted().forEach(tag -> tags.add(tag.toString())); row.add("tags", tags);
+            row.add("control",effect.control().encode());row.addProperty("application",effect.application().name());
             row.addProperty("dispellable", effect.operations().contains(io.github.fatalitaya.combatnexus.effect.api.EffectView.Operation.DISPEL));
-            effect.remainingTicks().ifPresent(remaining -> row.addProperty("expires", Math.addExact(now, remaining)));
+            effect.remainingTicks().ifPresent(remaining -> {
+                if (advancing.test(effect)) row.addProperty("expires", Math.addExact(now, remaining));
+                else row.addProperty("remaining", remaining);
+            });
             add(budget, effects, row);
         }
         json.add("effects", effects);
@@ -63,6 +67,6 @@ public final class CombatPanelProjector {
         return json;
     }
     private static void add(PresentationBudget budget, JsonArray rows, JsonElement row) {
-        budget.entry(1); budget.encoded(row.toString()); rows.add(row);
+        budget.entry(1); budget.encoded(row); rows.add(row);
     }
 }

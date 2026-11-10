@@ -143,6 +143,16 @@ public final class DamageModuleContext implements DamagePhaseAccess {
     private final DamageSourceContext sourceContext;
     private final DamageContextMutations mutations;
     private final NativeDamageRuleContext restrictedView;
+    private final NativeDamageContextView readOnlyView = new ReadOnlyDamageContext(this);
+    NativeDamageContextView readOnlyView() { return readOnlyView; }
+    void processorFailed(NexusId processor, DamagePhase phase, String callback, Exception failure) {
+        try {
+            CombatServerRuntime.of((io.github.fatalitaya.combatnexus.combat.spi.ServerRuntimeBinding)((ServerLevel)victim.level()).getServer())
+                .recordProcessorFailure(processor, phase, callback, damageId(), failure);
+        } catch (RuntimeException ignored) {
+            // Diagnostics cannot change tolerant callback settlement.
+        }
+    }
 
     private final DamagePipelineResult result = new DamagePipelineResult();
     private final DamagePacketState packet;

@@ -45,7 +45,7 @@
         var Fire=cls("combat.action.api.EntityCommand$Ignite"),Move=cls("combat.action.api.EntityCommand$Displace"),Vec=cls("api.geometry.Vector3");
         check(api.entities().submit(new Fire(UUID.randomUUID(),e.getUUID(),source,80)).applied()&&e.getRemainingFireTicks()===80,"typed ignition writes native fire timer");
         e.clearFire();var startX=e.getX();
-        var moved=api.entities().submit(new Move(UUID.randomUUID(),e.getUUID(),source,new Vec(1,0,0),Move.Mode.POSITION));
+        var moved=api.entities().submit(new Move(UUID.randomUUID(),e.getUUID(),source,new Vec(1,0,0),Move.Mode.POSITION,Move.Origin.EXTERNAL_CONTROL));
         check(moved.applied()&&e.getX()===startX+1&&moved.journal().entries().size()===3,"typed displacement records native position components");
         var correction=new Health(UUID.randomUUID(),e.getUUID(),source,8,Health.Reason.MAXIMUM_CHANGED);
         var result=api.health().correct(correction);

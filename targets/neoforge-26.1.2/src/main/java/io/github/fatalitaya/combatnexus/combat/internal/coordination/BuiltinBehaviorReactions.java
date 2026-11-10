@@ -30,6 +30,25 @@ public final class BuiltinBehaviorReactions {
         var result = c.world().damage(request);
         return new ReactionResult("child_" + result.status().name().toLowerCase(Locale.ROOT), Optional.of("damage/" + request.lineage().damageId()));
     }
+    public static ReactionResult reflectBlock(BuiltinBehaviors.ItemBlockReflection definition, SettlementContext c,
+            DamageSettlementSnapshot damage, io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt block) {
+        var live = io.github.fatalitaya.combatnexus.combat.damage.api.event.DamageSettlementContext.current(damage);
+        var attacker = live.logicalAttacker();
+        var blocker = live.target();
+        var parent = c.damageAuthority().get();
+        if (definition.ratio() <= 0 || !damage.itemBlocked() || damage.requestKind() != DamageRequestKind.PRIMARY
+                || !damage.triggerPolicy().reflectionAllowed() || parent.isEmpty()
+                || blocker == null || !blocker.isAlive() || attacker == null || !attacker.isAlive() || attacker == blocker)
+            return skipped("ineligible_item_block_reflection");
+        var limited = c.claim().apply(definition.limit());
+        if (limited.isPresent()) return skipped(limited.get());
+        var request = DamageRequest.builder(live.level(), attacker,
+                DamageSourceDescriptor.of(NexusId.withDefaultNamespace("thorns")), (float)(block.blocked() * definition.ratio()))
+            .kind(DamageRequestKind.REFLECTED).parent(parent.orElseThrow()).logicalAttacker(blocker).directEntity(blocker)
+            .triggerPolicy(DamageTriggerPolicy.NONE_ALLOWED).build();
+        var result = c.world().damage(request);
+        return new ReactionResult("child_" + result.status().name().toLowerCase(Locale.ROOT), Optional.of("damage/" + request.lineage().damageId()));
+    }
     public static NexusId overflowPool(BehaviorSource source) { return NexusId.fromNamespaceAndPath("combatnexus", "overflow/" + source.installation()); }
     public static ReactionResult overflow(BuiltinBehaviors.OverflowShield definition, SettlementContext c) {
         var s = c.settlement().result(HealingSettlement.class).orElseThrow(); var source = c.source().orElseThrow();

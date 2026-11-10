@@ -14,6 +14,8 @@ public final class DamageRuleContextViews {
 
     public static io.github.fatalitaya.combatnexus.combat.damage.api.context.NativeDamageContextView readOnly(
             io.github.fatalitaya.combatnexus.combat.damage.api.context.NativeDamageContextView context) {
+        if (context instanceof DamageModuleContext internal) return internal.readOnlyView();
+        if (context instanceof ReadOnlyDamageContext) return context;
         return new ReadOnlyDamageContext(context);
     }
 

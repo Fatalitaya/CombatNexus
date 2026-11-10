@@ -20,10 +20,30 @@ public final class WorldEquipmentObservation implements EquipmentObservation {
     public boolean alive(UUID target) {
         return level.getEntity(target) instanceof LivingEntity living && living.isAlive();
     }
+    private record Declaration(long incarnation, long generation, boolean empty,
+            io.github.fatalitaya.combatnexus.api.id.NexusId item,
+            CombatItemBindingSpec defaults,
+            io.github.fatalitaya.combatnexus.combat.api.item.CombatItemBindingPatch patch) {}
+    private record Observation(Declaration declaration, EquipmentItem resolved) {}
+    private final java.util.Map<UUID, java.util.Map<EquipmentPosition, Observation>> observations = new java.util.HashMap<>();
     public Optional<EquipmentItem> item(UUID target, EquipmentPosition slot) {
-        return level.getEntity(target) instanceof LivingEntity living
-                ? Optional.of(capture(level, living.getItemBySlot(NativeEquipment.slot(slot)))) : Optional.empty();
+        if (!NativeEquipment.positions().contains(slot)) return Optional.empty();
+        if (!(level.getEntity(target) instanceof LivingEntity living)) { clear(target); return Optional.empty(); }
+        var stack = living.getItemBySlot(NativeEquipment.slot(slot));
+        var generation = io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing(level).definitions().generation();
+        var declaration = new Declaration(((io.github.fatalitaya.combatnexus.combat.spi.ParticipantInstance)living).combatnexus$incarnation(),
+            generation, stack.isEmpty(), NativeIds.nexus(BuiltInRegistries.ITEM.getKey(stack.getItem())),
+            io.github.fatalitaya.combatnexus.combat.api.item.CombatItems.defaults(stack),
+            io.github.fatalitaya.combatnexus.combat.api.item.CombatItems.patch(stack));
+        var slots = observations.computeIfAbsent(target, ignored -> new java.util.EnumMap<>(EquipmentPosition.class));
+        var previous = slots.get(slot);
+        if (previous != null && previous.declaration().equals(declaration)) return Optional.of(previous.resolved());
+        var observed = capture(level, stack);
+        slots.put(slot, new Observation(declaration, observed));
+        return Optional.of(observed);
     }
+    @Override public void clear(UUID target) { observations.remove(target); }
+    @Override public void close() { observations.clear(); }
     public static EquipmentItem capture(ServerLevel level, ItemStack stack) {
         var item=NativeIds.nexus(BuiltInRegistries.ITEM.getKey(stack.getItem()));
         try {

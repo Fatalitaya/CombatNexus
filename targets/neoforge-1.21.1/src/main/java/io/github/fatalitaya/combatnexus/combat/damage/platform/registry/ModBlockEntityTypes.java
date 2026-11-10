@@ -1,0 +1,44 @@
+package io.github.fatalitaya.combatnexus.combat.damage.platform.registry;
+
+import io.github.fatalitaya.combatnexus.combat.damage.platform.bootstrap.DamageModule;
+import io.github.fatalitaya.combatnexus.combat.damage.platform.block.entity.DamageDummyBlockEntity;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+/**
+ * DamageModule block entity type registry.
+ *
+ * <p>{@code DamageDummyBlockEntity} is the lifecycle controller for the
+ * anchored dummy; it persists only the linked entity's UUID and never
+ * duplicates attribute/health state.</p>
+ */
+public final class ModBlockEntityTypes {
+
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
+            DeferredRegister.create(
+                    Registries.BLOCK_ENTITY_TYPE,
+                    DamageModule.MODID
+            );
+
+    public static final DeferredHolder<
+            BlockEntityType<?>,
+            BlockEntityType<DamageDummyBlockEntity>
+            > DAMAGE_DUMMY =
+            BLOCK_ENTITY_TYPES.register(
+                    "damage_dummy",
+                    () -> BlockEntityType.Builder.of(
+                            DamageDummyBlockEntity::new,
+                            ModBlocks.DAMAGE_DUMMY.get()
+                    ).build(null)
+            );
+
+    private ModBlockEntityTypes() {
+    }
+
+    public static void register(IEventBus eventBus) {
+        BLOCK_ENTITY_TYPES.register(eventBus);
+    }
+}

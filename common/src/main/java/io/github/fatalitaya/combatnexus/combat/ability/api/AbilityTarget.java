@@ -17,7 +17,7 @@ public sealed interface AbilityTarget {
     }
     record Entities(List<UUID> entities) implements AbilityTarget {
         public Entities {
-            if (entities.isEmpty() || entities.size() > 32 || new HashSet<>(entities).size() != entities.size()) throw new IllegalArgumentException("Invalid ability entity set");
+            if (entities.size() > 32 || new HashSet<>(entities).size() != entities.size()) throw new IllegalArgumentException("Invalid ability entity set");
             entities = List.copyOf(entities);
         }
         public Kind kind() { return Kind.ENTITIES; }

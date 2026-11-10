@@ -32,7 +32,7 @@ public final class NativeEffectBridge {
     private static final Set<NexusId> MANAGED = new LinkedHashSet<>();
     private static final Map<NexusId, java.util.function.IntFunction<BehaviorPlan>> PLANS = new HashMap<>();
     private static final Map<LivingEntity, List<EffectInstance>> DEATH_CALLBACKS = new WeakHashMap<>();
-    private record Pending(MobEffectInstance effect, UUID source, boolean force, io.github.fatalitaya.combatnexus.combat.api.source.SourceProvenance provenance) {}
+    private record Pending(MobEffectInstance effect, UUID source, boolean force, io.github.fatalitaya.combatnexus.combat.api.source.SourceProvenance provenance, EffectApplicationPolicy application) {}
     private static final Map<LivingEntity, List<Pending>> PENDING = new WeakHashMap<>();
     private NativeEffectBridge() {}
     public static void registerProjection(NexusId id) { MANAGED.add(id); }
@@ -117,21 +117,43 @@ public final class NativeEffectBridge {
             new io.github.fatalitaya.combatnexus.presentation.platform.network.EffectTooltipPayload(player.getUUID(), CombatWorldSessions.current((io.github.fatalitaya.combatnexus.combat.spi.WorldRuntimeBinding) (player.level())).orElseThrow(),
                 io.github.fatalitaya.combatnexus.combat.damage.api.DamageModuleApi.definitionGeneration(io.github.fatalitaya.combatnexus.combat.internal.definition.CombatDefinitions.forRuntime(io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatServerRuntime.of((io.github.fatalitaya.combatnexus.combat.spi.ServerRuntimeBinding) (player.level().getServer())))), NativeIds.nexus(player.level().dimension().identifier()), id, ""));
     }
-    public static boolean add(LivingEntity entity, MobEffectInstance incoming, Entity source, boolean force) {
-        return add(entity, incoming, source, source == null ? null : source.getUUID(), force, EquipmentCombatAdapter.effects().origin(entity, source == null ? null : source.getUUID()));
+    public static Set<NexusId> tags(Holder<MobEffect> effect) {
+        return effect.tags().map(tag -> NativeIds.nexus(tag.location())).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
-    private static boolean add(LivingEntity entity, MobEffectInstance incoming, Entity source, UUID sourceId, boolean force, io.github.fatalitaya.combatnexus.combat.api.source.SourceProvenance provenance) {
+    public static Set<ControlCategory> controlCategories(NexusId effect){
+        if(!effect.namespace().equals("minecraft"))return Set.of();
+        return switch(effect.path()){
+            case "slowness","levitation" -> Set.of(ControlCategory.MOVEMENT);
+            case "mining_fatigue" -> Set.of(ControlCategory.ACTION);
+            case "blindness","darkness" -> Set.of(ControlCategory.PERCEPTION);
+            default -> Set.of();
+        };
+    }
+    public static boolean addForced(LivingEntity entity,MobEffectInstance incoming,Entity source){
+        if(!managed(incoming.getEffect()))return ForcedNativeEffect.apply(entity,incoming,source);
+        return add(entity,incoming,source,source==null?null:source.getUUID(),false,
+            EquipmentCombatAdapter.effects().origin(entity,source==null?null:source.getUUID()),EffectApplicationPolicy.FORCE);
+    }
+    public static boolean add(LivingEntity entity, MobEffectInstance incoming, Entity source, boolean force) {
+        return add(entity, incoming, source, source == null ? null : source.getUUID(), force, EquipmentCombatAdapter.effects().origin(entity, source == null ? null : source.getUUID()),EffectApplicationPolicy.NORMAL);
+    }
+    private static boolean add(LivingEntity entity, MobEffectInstance incoming, Entity source, UUID sourceId, boolean force, io.github.fatalitaya.combatnexus.combat.api.source.SourceProvenance provenance,EffectApplicationPolicy application) {
         if (!ready(entity)) {
-            PENDING.computeIfAbsent(entity, ignored -> new ArrayList<>()).add(new Pending(new MobEffectInstance(incoming), sourceId, force, provenance));
+            PENDING.computeIfAbsent(entity, ignored -> new ArrayList<>()).add(new Pending(new MobEffectInstance(incoming), sourceId, force, provenance,application));
             return true;
         }
-        if (!net.neoforged.neoforge.common.CommonHooks.canMobEffectBeApplied(entity, incoming, source)) return false;
+        if (application==EffectApplicationPolicy.NORMAL&&!net.neoforged.neoforge.common.CommonHooks.canMobEffectBeApplied(entity, incoming, source)) return false;
+        if(application==EffectApplicationPolicy.NORMAL){
+            var id=NativeIds.nexus(incoming.getEffect().unwrapKey().orElseThrow().identifier());
+            var runtime=io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing((ServerLevel)entity.level());
+            if(runtime.effects().immune(entity.getUUID(),id,tags(incoming.getEffect()),controlCategories(id)))return false;
+        }
         var old = state(entity, incoming.getEffect());
         var level = (ServerLevel)entity.level();
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new net.neoforged.neoforge.event.entity.living.MobEffectEvent.Added(
             entity, old.map(e -> projection(e, io.github.fatalitaya.combatnexus.combat.time.platform.NativeBusinessTime.now(entity, e.snapshot().source()))).orElse(null), incoming, source));
         if (incoming.getEffect().value().isInstantenous()) {
-            return instant(incoming.getEffect(), entity, source, source, incoming.getAmplifier(), 1).outcome() == EffectResult.Outcome.APPLIED;
+            return instant(incoming.getEffect(), entity, source, source, incoming.getAmplifier(), 1,application).outcome() == EffectResult.Outcome.APPLIED;
         }
         if (incoming.getDuration() == 0) return false;
         var id = NativeIds.nexus(incoming.getEffect().unwrapKey().orElseThrow().identifier());
@@ -155,7 +177,7 @@ public final class NativeEffectBridge {
         }).toList());
         var instance = new EffectInstance(new EffectSnapshot(entity.getUUID(), id, origin, incoming.getAmplifier(), lifetime.deadline(io.github.fatalitaya.combatnexus.combat.time.platform.NativeBusinessTime.now(entity, origin)), Set.of(), lifetime.kind()),
             attrs, io.github.fatalitaya.combatnexus.effect.api.EffectOwnership.MANAGED, plan,
-            new EffectPolicy(EffectPolicy.Category.valueOf(incoming.getEffect().value().getCategory().name()), true), List.of(), display);
+            new EffectPolicy(EffectPolicy.Category.valueOf(incoming.getEffect().value().getCategory().name()),true,tags(incoming.getEffect()),new EffectControl(controlCategories(id),Set.of(),Set.of(),Set.of()),application), List.of(), display);
         var result = CombatAccess.find((io.github.fatalitaya.combatnexus.combat.spi.WorldRuntimeBinding) (level)).orElseThrow().effects().apply(new EffectApplication(UUID.randomUUID(), instance,
             force ? EffectService.Stacking.REPLACE : EffectService.Stacking.STRONGER_WITH_HIDDEN));
         if (result.outcome() != EffectResult.Outcome.APPLIED) return false;
@@ -177,9 +199,12 @@ public final class NativeEffectBridge {
     public static void readyInputs(LivingEntity entity) {
         var pending = PENDING.remove(entity); if (pending == null) return;
         var level = (ServerLevel)entity.level();
-        for (var value : pending) add(entity, value.effect(), value.source() == null ? null : level.getEntity(value.source()), value.source(), value.force(), value.provenance());
+        for (var value : pending) add(entity, value.effect(), value.source() == null ? null : level.getEntity(value.source()), value.source(), value.force(), value.provenance(),value.application());
     }
     public static EffectResult instant(Holder<MobEffect> type, LivingEntity target, Entity direct, Entity owner, int amplifier, double intensity) {
+        return instant(type,target,direct,owner,amplifier,intensity,EffectApplicationPolicy.NORMAL);
+    }
+    private static EffectResult instant(Holder<MobEffect> type, LivingEntity target, Entity direct, Entity owner, int amplifier, double intensity,EffectApplicationPolicy application) {
         if (!Double.isFinite(intensity) || intensity < 0) throw new IllegalArgumentException("Invalid instant intensity");
         var id = NativeIds.nexus(type.unwrapKey().orElseThrow().identifier());
         io.github.fatalitaya.combatnexus.combat.api.behavior.InstantBehavior behavior;
@@ -191,7 +216,7 @@ public final class NativeEffectBridge {
         var instance = new EffectInstance(new EffectSnapshot(target.getUUID(), id, source, amplifier, OptionalLong.empty(), Set.of(), EffectLifetime.Kind.INSTANT),
             List.of(), io.github.fatalitaya.combatnexus.effect.api.EffectOwnership.MANAGED, new BehaviorPlan(0, List.of(behavior)), EffectPolicy.DEFAULT, List.of(),
             new EffectDisplay(id, false, false, false, owner == null ? null : owner.getUUID(), true, false, false, EquipmentCombatAdapter.effects().origin(target, owner == null ? null : owner.getUUID())));
-        return CombatAccess.find((io.github.fatalitaya.combatnexus.combat.spi.WorldRuntimeBinding) ((ServerLevel)target.level())).orElseThrow().effects().apply(new EffectApplication(UUID.randomUUID(), instance, EffectService.Stacking.REPLACE));
+        return CombatAccess.find((io.github.fatalitaya.combatnexus.combat.spi.WorldRuntimeBinding) ((ServerLevel)target.level())).orElseThrow().effects().apply(new EffectApplication(UUID.randomUUID(), instance.withApplication(application), EffectService.Stacking.REPLACE));
     }
     public static boolean mayExpire(ServerLevel level, EffectInstance effect) {
                 if (effect.display().nativeId() == null || !(level.getEntity(effect.snapshot().target()) instanceof LivingEntity entity)) return true;

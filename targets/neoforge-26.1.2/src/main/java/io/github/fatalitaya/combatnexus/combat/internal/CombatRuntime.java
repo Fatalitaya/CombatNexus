@@ -126,6 +126,8 @@ public final class CombatRuntime {
     }
     private long tick = -1;
     private boolean closed;
+    private final WorldServices services;
+    public WorldServices services() { requireOwner(); return services; }
     private final io.github.fatalitaya.combatnexus.combat.internal.coordination.EquipmentBehaviorController equipment;
 
     public CombatRuntime(CombatServerRuntime serverRuntime, io.github.fatalitaya.combatnexus.combat.api.transaction.WorldSession worldSession, java.util.function.LongSupplier gameClock, ServerLevel level, HealingApplicationPort healingPort, RegenerationConditions conditions,
@@ -161,6 +163,7 @@ public final class CombatRuntime {
         var effectsImplementation = new io.github.fatalitaya.combatnexus.effect.internal.DefaultEffectService(immunity, behaviors.compose(effectExecutor), businessTime);
         effects = effectsImplementation;
         effectsView = effectsImplementation.businessView();
+        services = new WorldServices(this);
         serverRuntime.attach(worldSession(), this);
     }
 
@@ -256,10 +259,10 @@ public final class CombatRuntime {
         var behaviorViews = behaviors.view(entity.getUUID(), budget);
         var reactionFacts = reactions.facts(entity.getUUID(), budget);
         var input=new io.github.fatalitaya.combatnexus.combat.api.input.CombatInputFrame(sessionId,ContentAccess.get().keyId(level.dimension()),entity.getUUID(),snapshot.revision(),snapshot.gameTick(),
-                serverRuntime.definitions().orElseThrow().generation(),snapshot.valueFrame(),snapshot.provenance(),io.github.fatalitaya.combatnexus.combat.platform.NativeEntityCapture.capture(entity).facts(),behaviors.capture(entity.getUUID()));
+                serverRuntime.definitions().orElseThrow().generation(),snapshot.valueFrame(),snapshot.provenance(),io.github.fatalitaya.combatnexus.combat.platform.NativeEntityCapture.captureFacts(entity, budget),behaviors.capture(entity.getUUID()));
         var descriptions=io.github.fatalitaya.combatnexus.combat.internal.registration.CombatExtensions.describe(input);budget.accept(descriptions.size());
         return new CombatPanelSnapshot(snapshot, entity.getHealth(), entity.getAbsorptionAmount(),
-                shields.snapshot(entity.getUUID(), budget), ContentAccess.get().captureEffects(entity, budget).views(), behaviorViews.stream().map(view -> new CombatPanelSnapshot.BehaviorObservation(view.source().target(), view.source().effect(), view.source().source(), view.source().installation(), view.protectionAvailable(), view.source().plan().components().stream().map(io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorComponent::type).toList())).toList(), reactionFacts, descriptions, sources.snapshot(entity.getUUID()), equipment.projection(entity.getUUID()).stream().map(e->new CombatPanelSnapshot.EquipmentView(e.installation(),e.slot(),e.binding(),e.definition(),e.selected())).toList());
+                shields.snapshot(entity.getUUID(), budget), input.facts().effectViews(), behaviorViews.stream().map(view -> new CombatPanelSnapshot.BehaviorObservation(view.source().target(), view.source().effect(), view.source().source(), view.source().installation(), view.protectionAvailable(), view.source().plan().components().stream().map(io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorComponent::type).toList())).toList(), reactionFacts, descriptions, sources.snapshot(entity.getUUID()), equipment.projection(entity.getUUID()).stream().map(e->new CombatPanelSnapshot.EquipmentView(e.installation(),e.slot(),e.binding(),e.definition(),e.selected())).toList());
     }
 
     /** Death, respawn, world exit and dimension transfer reset all local counters and owned state. */
@@ -321,6 +324,7 @@ public final class CombatRuntime {
         requireOwner(); return definitions().behaviors();
     }
     public HealingService healing() { requireOwner(); return healingView; }
+    public void equipmentSourcesChanged(UUID target) { requireOwner(); equipment.invalidate(target); }
     public void equipmentChanged(UUID target, io.github.fatalitaya.combatnexus.api.equipment.EquipmentPosition slot, io.github.fatalitaya.combatnexus.combat.api.behavior.EquipmentItem current,
             io.github.fatalitaya.combatnexus.combat.spi.CombatEquipmentAccess.Permit permit) {
         Objects.requireNonNull(permit).require(this); requireOwner(); equipment.changed(target, slot, current);

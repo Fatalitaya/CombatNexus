@@ -119,6 +119,7 @@ public class DamageModulePipeline {
             );
         } catch (Exception exception) {
             ctx.rollbackMutableState(checkpoint);
+            ctx.processorFailed(entry.registryId(), phase, "canHandle", exception);
 
             return false;
         }
@@ -137,6 +138,7 @@ public class DamageModulePipeline {
             );
         } catch (Exception exception) {
             ctx.rollbackMutableState(checkpoint);
+            ctx.processorFailed(entry.registryId(), phase, "apply", exception);
 
         }
     }

@@ -80,12 +80,18 @@ public abstract class LivingEntityMomentsMixin {
         try { original.call(); }
         finally { combatnexus$effectDepth--; if (outer) combatnexus$changes(before, null, true); }
     }
-    @WrapMethod(method="applyItemBlocking")
-    private float combatnexus$itemBlock(ServerLevel level,DamageSource source,float amount,Operation<Float> original) {
-        var target=(LivingEntity)(Object)this;var stack=target.getItemBlockingWith();
-        var item=stack==null?NexusId.parse("minecraft:air"):NativeIds.nexus(BuiltInRegistries.ITEM.getKey(stack.getItem()));
-        float blocked=original.call(level,source,amount);
-        EquipmentCombatAdapter.nativeDamage().itemBlocked(target, source, item, blocked);
-        return blocked;
+    @com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(method="applyItemBlocking", at=@At(value="INVOKE", target="Lnet/neoforged/neoforge/common/damagesource/DamageContainer;setBlockedDamage(Lnet/neoforged/neoforge/event/entity/living/LivingShieldBlockEvent;)V"), require=1)
+    private void combatnexus$itemBlock(net.neoforged.neoforge.common.damagesource.DamageContainer container,
+            net.neoforged.neoforge.event.entity.living.LivingShieldBlockEvent event, Operation<Void> original) {
+        var target = (LivingEntity)(Object)this;
+        var item = NativeIds.nexus(BuiltInRegistries.ITEM.getKey(target.getUseItem().getItem()));
+        var hand = target.getUsedItemHand() == net.minecraft.world.InteractionHand.MAIN_HAND
+                ? io.github.fatalitaya.combatnexus.api.equipment.EquipmentPosition.MAINHAND
+                : io.github.fatalitaya.combatnexus.api.equipment.EquipmentPosition.OFFHAND;
+        float incoming = container.getNewDamage();
+        original.call(container, event);
+        if (event.getBlocked() && !target.getUseItem().isEmpty() && container.getBlockedDamage() > 0) EquipmentCombatAdapter.nativeDamage().itemBlocked(target, container.getSource(),
+                new io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt(
+                        item, hand, incoming, container.getBlockedDamage(), container.getNewDamage(), false));
     }
 }

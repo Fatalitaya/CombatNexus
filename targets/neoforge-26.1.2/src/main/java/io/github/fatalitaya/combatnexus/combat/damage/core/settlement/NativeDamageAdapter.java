@@ -56,10 +56,8 @@ public final class NativeDamageAdapter implements NativeDamageAccess {
                 java.util.Optional.ofNullable(source.getDirectEntity()).map(net.minecraft.world.entity.Entity::getUUID),
                 DamageSettlementTracker.currentOperation(target, source)));
     }
-    public void itemBlocked(LivingEntity target, DamageSource source, io.github.fatalitaya.combatnexus.api.id.NexusId item, float amount) {
-        if (target.level() instanceof ServerLevel level && amount > 0)
-            io.github.fatalitaya.combatnexus.combat.spi.CombatMomentAccess.publish(level, new io.github.fatalitaya.combatnexus.combat.api.action.CombatMoment.ItemBlock(
-                target.getUUID(), java.util.Optional.ofNullable(source.getEntity()).map(net.minecraft.world.entity.Entity::getUUID), item, amount));
+    public void itemBlocked(LivingEntity target, DamageSource source, io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt receipt) {
+        DamageSettlementTracker.recordItemBlock(target, source, receipt);
     }
     public void partHit(net.minecraft.world.entity.Entity part, LivingEntity target, DamageSource source, boolean accepted) {
         if (target.level() instanceof ServerLevel level)

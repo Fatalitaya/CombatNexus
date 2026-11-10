@@ -8,7 +8,7 @@ import java.util.*;
 /** A waiting continuation checkpoint. Completed or uncertain steps are never restored as pending. */
 public record SavedAbility(UUID execution,UUID action,UUID source,NexusId contribution,AbilityDefinition definition,
                            AbilityTarget target,AbilityParameters input,AbilityParameters state,int step,
-                           DriverScope scope,long remaining,List<AbilitySnapshot.CommandEvidence> commands,List<io.github.fatalitaya.combatnexus.combat.api.bridge.DecisionSample> samples) {
+                           DriverScope scope,long remaining,List<AbilitySnapshot.CommandEvidence> commands,List<io.github.fatalitaya.combatnexus.combat.api.bridge.DecisionSample> samples,boolean released) {
     public SavedAbility {
         Objects.requireNonNull(execution);Objects.requireNonNull(action);Objects.requireNonNull(source);Objects.requireNonNull(contribution);
         Objects.requireNonNull(definition);Objects.requireNonNull(target);Objects.requireNonNull(input);Objects.requireNonNull(state);Objects.requireNonNull(scope);commands=List.copyOf(commands);samples=List.copyOf(samples);

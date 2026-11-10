@@ -110,6 +110,20 @@ Effect level 为 0..255。lifetime 为嵌套对象：TIMED 需要正 ticks；PER
 
 治疗规则 phase 仅为 CONTRIBUTIONS / LIMITS，不能替代 RECEIVED；空选择器表示不限制，生命比例在 0..1 闭区间。恢复定义明确速率、受伤延迟、游戏规则、脱战条件及期限。护盾定义明确容量、优先级、类型/标签/通道、恢复及叠加，通道引用验证本次候选注册表。
 
+## 命名定义与物品绑定
+
+行为类型注册与命名定义分开：`CombatRegistrar.behavior(...)` 注册组件类型，`definitions()` 收集命名声明。Java 默认定义与数据包使用共同编译和校验；同 ID 的数据包定义整体覆盖 Java 默认值，移除覆盖后恢复默认。失败保留完整旧代际，注册定义本身不授予收益。
+
+物品默认声明通过 `CombatItems.defaults(Item.Properties, ...)` 写入 `combatnexus:item_bindings`；实例补丁使用 `combatnexus:item_binding_patch`。当前 `CombatItemBindingSpec.Binding` 的 kind 仅为 ENTRY / AFFIX，`template`、内联 `entry`、内联 `affix` 三选一并匹配 kind，slots 非空且不重复。不可恢复旧计划中的 EFFECT / BEHAVIOR 绑定种类、统一 `definition` 字段或空 slots 伤害模板格式。共享声明与解析归 common，原生组件、物品观察及授权写入归 target。
+
+definition ID、binding ID 和世界/实体/槽位上的运行来源身份分别承担引用、独立编辑和安装身份职责。绑定 ID 在同一声明内唯一；重复调用 defaults 追加不同 ID，同 ID 拒绝。默认原型只计入一次，不能把 `ItemStack.get(...)` 返回的有效默认值再次当作实例增量。
+
+合并顺序固定为物品默认声明、按贡献 ID 排序的 Java 绑定贡献、按 priority 升序及资源 ID 排序的数据包操作、实例补丁。数据包目录为 `combatnexus_item_bindings`，资源包含 `item`、`priority`、`operations`；同路径仍遵循原版资源覆盖。定义与绑定索引共同发布，伤害捕获、装备对账与客户端声明展示使用同一合并语义。
+
+`ADD` 要求 ID 不存在并追加到末尾；`REPLACE` 要求存在并保留位置；`REMOVE` 对不存在的 ID 无操作。补丁 `clearInherited=true` 先清空继承结果，再依序应用操作；空补丁继承，删除补丁恢复继承。补丁写入须经服务端授权和完整校验，失败保留原值；重载使补丁不适用时明确拒绝该物品解析，不回退成其他收益。
+
+来源仍按世界/实体会话、槽位和 binding ID 对账。相同装备声明直接替换不刷新收益，实际卸下再装备按安装生命周期处理；补丁变化须进入对账。重载和新进程恢复不返还已消费次数或重发收益，保留周期及冷却进度；部分安装失败沿用来源账本协调。客户端只合并声明和格式化说明，不安装来源或计算战斗结果。
+
 ## 展示、缓存与诊断
 
 活动 Effect 与面板来自服务端权威快照；客户端格式化和排版不成为第二套权威计算。物品说明直接读取当前 ItemStack 的已保存组件并复用描述器，ID 引用使用同步定义；不查服务端槽位、不等待实例回包，不用静态模板替代实例数值。缺失、空投影或渲染失败保留原版及其他模组提示，不追加失败说明；先在副本完成渲染再更新列表。

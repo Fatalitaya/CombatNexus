@@ -16,9 +16,41 @@ public final class DefaultEffectService implements EffectServiceControl {
             public void remove(UUID target, NexusId effect, NexusId source, Removal reason) { DefaultEffectService.this.remove(target, effect, source, reason); }
             public List<EffectInstance> snapshot(UUID target) { return DefaultEffectService.this.snapshot(target); }
             public List<EffectInstance> snapshot(UUID target, java.util.function.IntConsumer budget) { return DefaultEffectService.this.snapshot(target, budget); }
+            public boolean immune(UUID target,NexusId effect,Set<NexusId> tags,Set<ControlCategory> categories){return DefaultEffectService.this.immune(target,effect,tags,categories);}
+            public List<EffectCleanse.Entry> cleanse(EffectCleanse request){return DefaultEffectService.this.cleanse(request);}
             public int restrictionMask(UUID target) { return DefaultEffectService.this.restrictionMask(target); }
             public Set<NexusId> pendingSources(UUID target) { return DefaultEffectService.this.pendingSources(target); }
         };
+    }
+    public boolean immune(UUID target,NexusId effect,Set<NexusId> tags,Set<ControlCategory> categories){
+        requireOpen();
+        return group(target).values().stream().filter(e->!suspended(target,e.snapshot().source())&&!pending.containsKey(key(e)))
+            .anyMatch(e->e.policy().control().matches(effect,tags,categories));
+    }
+    public List<EffectCleanse.Entry> cleanse(EffectCleanse request){
+        requireOpen();requireGameplayWrite();var results=new ArrayList<EffectCleanse.Entry>();
+        for(var previous:List.copyOf(group(request.target()).values())){
+            var layers=new ArrayList<EffectInstance>();layers.add(previous);layers.addAll(previous.hidden());
+            var retained=new ArrayList<EffectInstance>();boolean changed=false;
+            for(int i=0;i<layers.size();i++){
+                var layer=layers.get(i);boolean matches=request.matches(layer),remove=matches&&layer.policy().dispellable();
+                if(matches)results.add(new EffectCleanse.Entry(layer.snapshot().effect(),layer.snapshot().source(),i>0,remove));
+                if(remove)changed=true;
+                else retained.add(new EffectInstance(layer.snapshot(),layer.attributes(),layer.ownership(),layer.behavior(),layer.policy(),List.of(),layer.display(),layer.stacking()));
+            }
+            if(!changed)continue;
+            var key=key(previous);List<EffectInstance> after=List.of();
+            if(!retained.isEmpty()){
+                var first=retained.get(0);
+                after=List.of(new EffectInstance(first.snapshot(),first.attributes(),first.ownership(),first.behavior(),first.policy(),retained.subList(1,retained.size()),first.display(),first.stacking()));
+            }
+            var change=new Change(List.of(previous),after,Optional.of(Removal.DISPELLED));commit(change);
+            expiry.cancel(key);
+            if(after.isEmpty()){active.get(request.target()).remove(key);insertionOrder.remove(key);order.remove(key);}
+            else{var value=after.get(0);active.get(request.target()).put(key,value);value.snapshot().expiresAtTick().ifPresent(deadline->expiry.schedule(key,deadline));}
+            updateRestrictions(request.target());changes.add(change);executor.committed(change);
+        }
+        return List.copyOf(results);
     }
     private record SuspendedSource(UUID target,NexusId source) {}
     private final Set<SuspendedSource> suspended = new HashSet<>();
@@ -57,6 +89,8 @@ public final class DefaultEffectService implements EffectServiceControl {
     private boolean closed;
     private boolean lifecycle;
     private boolean bindingUpdate;
+    private boolean restoring;
+    public void restoring(boolean value){requireOpen();requireGameplayWrite();restoring=value;}
     @Override public boolean bind(EffectBinding binding) {
         requireOpen(); requireGameplayWrite();
         var s = binding.effect().snapshot();
@@ -168,7 +202,7 @@ public final class DefaultEffectService implements EffectServiceControl {
         if (expired(snapshot)) return false;
         try (var compute = io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.isActive()
                 ? io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.computation() : null) {
-            if (immunity.test(effect)) return false;
+            if (!restoring && effect.policy().application()!=EffectApplicationPolicy.FORCE && (immunity.test(effect)||immune(effect.snapshot().target(),effect.snapshot().effect(),effect.policy().tags(),effect.policy().control().categories()))) return false;
         }
         if (snapshot.lifetime() == EffectLifetime.Kind.INSTANT) return executor.instant(effect).applied();
         Key key = key(effect);
@@ -208,7 +242,7 @@ public final class DefaultEffectService implements EffectServiceControl {
             throw new IllegalArgumentException("Expected an instant effect");
         try (var compute = io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.isActive()
                 ? io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.computation() : null) {
-            if (immunity.test(effect)) return io.github.fatalitaya.combatnexus.combat.api.CommandResult.rejected(
+            if (!restoring && effect.policy().application()!=EffectApplicationPolicy.FORCE && (immunity.test(effect)||immune(effect.snapshot().target(),effect.snapshot().effect(),effect.policy().tags(),effect.policy().control().categories()))) return io.github.fatalitaya.combatnexus.combat.api.CommandResult.rejected(
                     io.github.fatalitaya.combatnexus.combat.api.CommandRejection.Code.IMMUNE, "Effect immunity rejected application");
         }
         return executor.instant(effect);

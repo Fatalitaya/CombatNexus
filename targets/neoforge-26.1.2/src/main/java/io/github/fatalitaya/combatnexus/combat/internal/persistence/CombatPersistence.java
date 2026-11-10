@@ -44,6 +44,8 @@ public final class CombatPersistence {
     public void restore(UUID target, String encoded) {
         var state = io.github.fatalitaya.combatnexus.combat.internal.persistence.CombatStateCodec.decode(encoded);
         if (!state.target().equals(target)) throw new IllegalArgumentException("Persistent target mismatch");
+        effects.restoring(true);
+        try {
         time.restore(target,state.time());
         drivers.restore(target,state.drivers());
         long now = gameClock.getAsLong();
@@ -65,5 +67,6 @@ public final class CombatPersistence {
         equipment.restored(target);
         this.sources.notifyRestored(target);
         abilities.restore(target,state.abilities(),state.abilityCooldowns());
+        }finally{effects.restoring(false);}
     }
 }

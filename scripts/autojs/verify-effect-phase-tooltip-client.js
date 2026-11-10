@@ -18,7 +18,7 @@
                     new (cls("combat.api.behavior.BehaviorPlan"))(0, List.of(new (cls("combat.api.behavior.BuiltinBehaviors$PeriodicHealing"))(1, 20, -1, true, phase))), Set.of());
                 var view = new (cls("effect.api.EffectView"))(UUID.randomUUID(), id, Optional.of(id), Optional.empty(),
                     cls("effect.api.EffectOwnership").MANAGED, Set.of(), 2, OL.of(30), Optional.empty(),
-                    cls("effect.api.EffectView$Completeness").COMPLETE, Set.of());
+                    cls("effect.api.EffectView$Completeness").COMPLETE, Set.of(),cls("combat.api.source.SourceProvenance").UNKNOWN,cls("effect.api.EffectControl").NONE,cls("effect.api.EffectApplicationPolicy").NORMAL);
                 var block = cls("effect.api.EffectTooltip").instance(id, definition, view, cls("presentation.api.GeneratedTexts").literal("SOURCE_PROBE"));
                 var lines = [], key = "tooltip.combatnexus.effect.phase." + String(phase).toLowerCase();
                 for (var line of block.details()) lines.push(String(cls("presentation.platform.client.DisplayTextResolver").resolve(line).getString()));

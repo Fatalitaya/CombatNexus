@@ -36,6 +36,11 @@ public final class DamageSettlementSnapshot {
             );
     private final DamageSettlementEvidence evidence;
     public DamageSettlementEvidence evidence() { return evidence; }
+    /** A completed item block is independent of successfulHit and health/resource loss. */
+    public boolean itemBlocked() {
+        return !cancelled && evidence.beforeApplication().completed()
+                && evidence.itemBlock().filter(io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt::completed).isPresent();
+    }
     private final DamageOriginSnapshot origin;
     private final io.github.fatalitaya.combatnexus.combat.api.transaction.ParticipantIdentity target;
     private final java.util.UUID serverSessionId, worldSessionId;

@@ -19,6 +19,9 @@ public final class WorldEntityMotionAccess implements EntityMotionAccess {
         var value = mode == Mode.POSITION ? entity.position() : entity.getDeltaMovement();
         return new Vector3(value.x, value.y, value.z);
     }
+    public void knockback(UUID id, double strength, double x, double z) {
+        NativeKnockback.apply(target(id), strength, x, z);
+    }
     public void vector(UUID id, Mode mode, Vector3 value) {
         var entity = target(id);
         if (mode == Mode.POSITION) entity.teleportTo(value.x(), value.y(), value.z());

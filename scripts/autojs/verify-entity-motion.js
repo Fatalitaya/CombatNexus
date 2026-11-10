@@ -16,7 +16,7 @@
     try {
         check(rejects(function(){Worker.heal(cow,1).get(10,Time.SECONDS);}),"admitted entity still rejects worker-thread healing");
         var api=cls("combat.api.CombatAccess").find(level).orElseThrow();
-        var move=function(delta,mode){return new Move(UUID.randomUUID(),cow.getUUID(),source,delta,mode);};
+        var move=function(delta,mode){return new Move(UUID.randomUUID(),cow.getUUID(),source,delta,mode,Move.Origin.EXTERNAL_CONTROL);};
         var request=move(new Vec(1,2,3),Mode.POSITION),result=api.entities().submit(request);
         check(result.applied()&&cow.getX()===1&&cow.getY()===514&&cow.getZ()===3,"world-bound movement applies coordinates");
         check(result.journal().entries().size()===3&&result.journal().applicationCompleted(),"movement receipt confirms three axes");

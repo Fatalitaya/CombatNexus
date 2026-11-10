@@ -122,6 +122,8 @@ public final class CombatWorldLifecycle {
         }
         clear(event.getOriginal(), EffectService.Removal.RESPAWN);
         clear(event.getEntity(), EffectService.Removal.RESPAWN);
+        CombatPersistence.copyTransfer(event.getOriginal(),event.getEntity());
+        CombatPersistence.joined(event.getEntity());
     }
     @SubscribeEvent public static void dimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player) CombatPresentationNetwork.clear(player, player.level());

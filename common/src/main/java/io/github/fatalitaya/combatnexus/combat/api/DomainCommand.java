@@ -12,6 +12,12 @@ public sealed interface DomainCommand {
             return io.github.fatalitaya.combatnexus.combat.internal.registration.IntentCodecs.type(
                             i.value())
                     .id();
+        } else if (this instanceof WriteState<?> || this instanceof TakeState<?> || this instanceof RemoveState) {
+            return new io.github.fatalitaya.combatnexus.api.id.NexusId("combatnexus", "runtime_state");
+        } else if (this instanceof Cleanse) {
+            return new io.github.fatalitaya.combatnexus.api.id.NexusId("combatnexus", "effect_cleanse");
+        } else if (this instanceof AbilityCooldown) {
+            return new io.github.fatalitaya.combatnexus.api.id.NexusId("combatnexus", "ability_cooldown");
         } else if (this instanceof Heal ignored) {
             return io.github.fatalitaya.combatnexus.api.id.NexusId.fromNamespaceAndPath(
                     "combatnexus", "healing");
@@ -58,6 +64,23 @@ public sealed interface DomainCommand {
         }
     }
 
+    record WriteState<T>(UUID requestId, io.github.fatalitaya.combatnexus.combat.state.api.StateAddress<T> address,
+                         CombatSource source, T value) implements DomainCommand {
+        public WriteState { Objects.requireNonNull(requestId); Objects.requireNonNull(address); Objects.requireNonNull(source); Objects.requireNonNull(value); }
+    }
+    record TakeState<T>(UUID requestId, io.github.fatalitaya.combatnexus.combat.state.api.StateAddress<T> address,
+                        CombatSource source) implements DomainCommand {
+        public TakeState { Objects.requireNonNull(requestId); Objects.requireNonNull(address); Objects.requireNonNull(source); }
+    }
+    record RemoveState(UUID requestId, io.github.fatalitaya.combatnexus.combat.state.api.StateAddress<?> address,
+                       CombatSource source) implements DomainCommand {
+        public RemoveState { Objects.requireNonNull(requestId); Objects.requireNonNull(address); Objects.requireNonNull(source); }
+    }
+
+    record Cleanse(io.github.fatalitaya.combatnexus.effect.api.EffectCleanse request) implements DomainCommand { public Cleanse { Objects.requireNonNull(request); } }
+    record AbilityCooldown(io.github.fatalitaya.combatnexus.combat.ability.api.AbilityCooldownCommand request) implements DomainCommand {
+        public AbilityCooldown { Objects.requireNonNull(request); }
+    }
     public record Entity(io.github.fatalitaya.combatnexus.combat.action.api.EntityCommand request)
             implements DomainCommand {
         public Entity {

@@ -7,6 +7,9 @@ import java.util.UUID;
 
 /** Callback-scoped domain command capability. Retaining it does not retain permission. */
 public interface AbilityExecution {
+    enum Invocation { FIRST, AUTOMATIC, INPUT }
+    Invocation invocation();
+    void released();
     AbilityInput input();
     CombatAction action();
     int step();

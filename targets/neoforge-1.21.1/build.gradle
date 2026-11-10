@@ -33,19 +33,7 @@ sourceSets {
 }
 
 tasks.register('prepareCommonSources', Sync) {
-    from('../../common/src/main/java') {
-        // DamageModule requires the NeoForge 26.1.2 adapters; port tracked in docs/DEVELOPMENT.md.
-        exclude 'io/github/fatalitaya/combatnexus/combat/**'
-        exclude 'io/github/fatalitaya/combatnexus/attribute/**'
-        exclude 'io/github/fatalitaya/combatnexus/formula/**'
-        exclude 'io/github/fatalitaya/combatnexus/effect/**'
-        exclude 'io/github/fatalitaya/combatnexus/presentation/**'
-        // This target's version differences are registered here: exclude one
-        // path per common file that this target replaces with its own
-        // implementation, for example
-        //     exclude 'com/example/network/ChunkPacket.java'
-        // Everything not listed here stays shared with every other target.
-    }
+    from('../../common/src/main/java')
     into "$buildDir/generated/common-main"
 }
 tasks.named('compileJava').configure { dependsOn 'prepareCommonSources' }
@@ -90,6 +78,9 @@ repositories {
 }
 
 dependencies {
+    jarJar project(':combatnexus_compat')
+    runtimeOnly project(':combatnexus_compat')
+    compileOnly 'org.jspecify:jspecify:1.0.0'
     // Debug tooling only; not bundled or published as a CombatNexus dependency.
     runtimeOnly 'com.sighs.autojs:AutoJS-neoforge-1.21.1:1.0.1'
     // AutoJS declares Rhino in mod metadata, but omits it from its POM.
@@ -137,8 +128,7 @@ tasks.withType(JavaCompile).configureEach {
 
 apply from: file('../../gradle/target-conventions/publish.gradle')
 
-// Scaffolds are not publishable CombatNexus implementations.
+// Publication stays disabled until the 1.21.1 target is explicitly released.
 tasks.matching { it.name.startsWith('publish') }.configureEach {
-    doFirst { throw new GradleException('This target is a scaffold; migrate damage adapters before publishing.') }
+    doFirst { throw new GradleException('Publication of the 1.21.1 development target is disabled.') }
 }
-sourceSets.main.resources.exclude 'assets/combatnexus/**', 'data/**', 'icon*.png'

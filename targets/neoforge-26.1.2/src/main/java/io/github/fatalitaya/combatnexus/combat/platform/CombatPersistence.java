@@ -37,7 +37,7 @@ public final class CombatPersistence {
         if (!level.getServer().isSameThread()
                 || !ACTIVE.getOrDefault(level, Set.of()).contains(entity.getUUID())) return;
         // CHANGED_DIMENSION / UNLOADED already mark an otherwise living entity removed before this event.
-        if (entity.isDeadOrDying()) { entity.getPersistentData().remove(KEY); return; }
+        if (entity.isDeadOrDying()) return;
         entity.getPersistentData().putString(KEY, CombatWorldLifecycle.access().save(level, entity.getUUID()));
     }
     public static void leaving(LivingEntity entity, EffectService.Removal reason) {
@@ -45,8 +45,18 @@ public final class CombatPersistence {
         leaving(entity, level, reason);
     }
     public static void leaving(LivingEntity entity, ServerLevel level, EffectService.Removal reason) {
-        if (reason == EffectService.Removal.DEATH || reason == EffectService.Removal.RESPAWN) entity.getPersistentData().remove(KEY);
-        else save(entity, level);
+        if(ACTIVE.getOrDefault(level,Set.of()).contains(entity.getUUID())){
+            var runtime=io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing(level);
+            boolean death=reason==EffectService.Removal.DEATH||reason==EffectService.Removal.RESPAWN;
+            runtime.serverRuntime().lifecycle(runtime,()->runtime.abilityControl().prepareLeave(entity.getUUID(),death));
+            if(death){
+                var state=new io.github.fatalitaya.combatnexus.combat.internal.persistence.CombatPersistentState(entity.getUUID(),level.getGameTime(),Set.of(),
+                    List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),
+                    new io.github.fatalitaya.combatnexus.combat.time.internal.SavedTime(0,0,null,List.of(),List.of()),
+                    List.of(),runtime.abilityControl().saveCooldowns(entity.getUUID()),Map.of());
+                entity.getPersistentData().putString(KEY,io.github.fatalitaya.combatnexus.combat.internal.persistence.CombatStateCodec.encode(state));
+            }else save(entity,level);
+        }
         var active = ACTIVE.get(level); if (active != null) active.remove(entity.getUUID());
         var pending = PENDING.get(level); if (pending != null) pending.remove(entity.getUUID());
     }
@@ -55,7 +65,11 @@ public final class CombatPersistence {
     }
     public static void close(ServerLevel level) {
         for (var id : List.copyOf(ACTIVE.getOrDefault(level, Set.of())))
-            if (level.getEntity(id) instanceof LivingEntity entity) save(entity);
+            if (level.getEntity(id) instanceof LivingEntity entity){
+                var runtime=io.github.fatalitaya.combatnexus.combat.internal.platform.PlatformWorldLifecycle.existing(level);
+                runtime.serverRuntime().lifecycle(runtime,()->runtime.abilityControl().prepareLeave(id,false));
+                save(entity);
+            }
         ACTIVE.remove(level); PENDING.remove(level);
     }
 }

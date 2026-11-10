@@ -14,7 +14,7 @@ public final class ManagedEffects {
         }
         var id = NexusId.fromNamespaceAndPath("combatnexus", "agility");
         return new EffectInstance(new EffectSnapshot(target, id, source, 0, OptionalLong.of(expiresAtTick), Set.of()),
-                List.of(new EffectInstance.AttributeContribution(NexusId.withDefaultNamespace("movement_speed"),
+                List.of(new EffectInstance.AttributeContribution(io.github.fatalitaya.combatnexus.attribute.api.CombatAttributes.movementSpeed(),
                         new AttributeSnapshot.Contribution(id, speedBonus, AttributeOperation.ADD_MULTIPLIED_TOTAL))),
                 io.github.fatalitaya.combatnexus.effect.api.EffectOwnership.MANAGED);
     }

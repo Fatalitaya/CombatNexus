@@ -24,14 +24,12 @@ public final class CombatStateCodec {
     }
     public static CombatPersistentState decode(String value) {
         if (value.length() > 1048576) throw new IllegalArgumentException("Combat save exceeds budget");
-        var reader = new com.google.gson.stream.JsonReader(new java.io.StringReader(value));
-        reader.setStrictness(Strictness.STRICT);
-        var json = JsonParser.parseReader(reader).getAsJsonObject();
+        JsonObject json;
+        try { json = io.github.fatalitaya.combatnexus.config.SettingsJson.read(new java.io.StringReader(value), 1048576, 262144); }
+        catch (java.io.IOException failure) { throw new IllegalArgumentException("Invalid combat save", failure); }
         io.github.fatalitaya.combatnexus.config.SettingsJson.fields(json, "target", "savedTick", "persistentSources",
                 "effects", "behaviors", "shields", "recovery", "equipment", "sources", "drivers", "time", "abilities", "abilityCooldowns", "definitionBindings");
         CombatPersistentState state = GSON.fromJson(json, CombatPersistentState.class);
-        try { if (reader.peek() != com.google.gson.stream.JsonToken.END_DOCUMENT) throw new IllegalArgumentException("Trailing combat save content"); }
-        catch (java.io.IOException failure) { throw new IllegalArgumentException("Invalid combat save", failure); }
         return Objects.requireNonNull(state);
     }
     private static final class BindingAdapter implements JsonSerializer<io.github.fatalitaya.combatnexus.combat.api.item.CombatItemBindingSpec.Binding>,JsonDeserializer<io.github.fatalitaya.combatnexus.combat.api.item.CombatItemBindingSpec.Binding>{

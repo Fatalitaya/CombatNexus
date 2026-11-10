@@ -14,12 +14,27 @@ modId = "neoforge"
 type = "required"
 versionRange = "${neoforge_version_range}"
 ordering = "NONE"
-side = "BOTH"
+side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId = "minecraft"
 type = "required"
-versionRange = "[${minecraft_version},1.21.2)"
+versionRange = "[${minecraft_version}]"
 ordering = "NONE"
-side = "BOTH"
+side="BOTH"
 
+
+[[mixins]]
+config="${mod_id}.mixins.json"
+
+[[mixins]]
+config="${mod_id}.healing.mixins.json"
+
+[[mixins]]
+config="combatnexus.control.mixins.json"
+
+[[mixins]]
+config="combatnexus.health.mixins.json"
+
+[[mixins]]
+config="combatnexus.effects.mixins.json"

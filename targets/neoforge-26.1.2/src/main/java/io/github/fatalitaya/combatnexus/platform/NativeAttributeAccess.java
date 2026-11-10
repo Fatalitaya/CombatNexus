@@ -6,6 +6,17 @@ import java.util.Optional;
 import io.github.fatalitaya.combatnexus.attribute.spi.AttributeAccess;
 import net.minecraft.core.registries.*;
 public final class NativeAttributeAccess implements AttributeAccess.Port, io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Port {
+    public NexusId vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla attribute) {
+        return NativeIds.nexus((switch (attribute) {
+            case ATTACK_DAMAGE -> Attributes.ATTACK_DAMAGE;
+            case ATTACK_SPEED -> Attributes.ATTACK_SPEED;
+            case MOVEMENT_SPEED -> Attributes.MOVEMENT_SPEED;
+            case ARMOR -> Attributes.ARMOR;
+            case ARMOR_TOUGHNESS -> Attributes.ARMOR_TOUGHNESS;
+            case MAX_HEALTH -> Attributes.MAX_HEALTH;
+            case MAX_ABSORPTION -> Attributes.MAX_ABSORPTION;
+        }).unwrapKey().orElseThrow().identifier());
+    }
     public static Holder<Attribute> resolve(NexusId id) { return BuiltInRegistries.ATTRIBUTE.get(NativeIds.nativeId(id)).orElseThrow(); }
     public String descriptionId(NexusId id) { return resolve(id).value().getDescriptionId(); }
     public double sanitize(NexusId id, double value) { return resolve(id).value().sanitizeValue(value); }

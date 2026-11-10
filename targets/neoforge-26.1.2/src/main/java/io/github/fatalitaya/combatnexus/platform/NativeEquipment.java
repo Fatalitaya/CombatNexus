@@ -5,6 +5,9 @@ import net.minecraft.world.entity.EquipmentSlot;
 
 /** Explicit translation at native equipment boundaries; null denotes unknown provenance. */
 public final class NativeEquipment {
+    public static java.util.Set<EquipmentPosition> positions() {
+        return java.util.Arrays.stream(EquipmentSlot.values()).map(NativeEquipment::position).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
     private NativeEquipment() {}
 
     public static EquipmentPosition position(EquipmentSlot slot) {

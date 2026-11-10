@@ -18,12 +18,23 @@ import net.minecraft.world.entity.LivingEntity;
 /** Separate facade: no cast from a business service to the runtime grants application access. */
 public final class WorldServices implements CombatWorld {
     private final CombatRuntime world;
-    public WorldServices(CombatRuntime world) { this.world = world; }
+    private final io.github.fatalitaya.combatnexus.combat.action.api.EntityCommands entities;
+private final EffectCommands effects;
+private final io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommands cooldowns;
+private final io.github.fatalitaya.combatnexus.combat.state.api.RuntimeStates states;
+private final io.github.fatalitaya.combatnexus.combat.api.scheduling.CombatScheduler scheduler;
+private final io.github.fatalitaya.combatnexus.combat.time.api.BusinessTime time;
+    public WorldServices(CombatRuntime world) {
+        this.world = world;
+        this.entities = new io.github.fatalitaya.combatnexus.combat.action.internal.WorldEntityCommands(world);
+        this.effects = new io.github.fatalitaya.combatnexus.effect.internal.WorldEffectCommands(world);
+        this.cooldowns = new io.github.fatalitaya.combatnexus.combat.state.internal.WorldCooldownCommands(world);
+        this.states = new io.github.fatalitaya.combatnexus.combat.state.internal.WorldStateCommands(world);
+        this.scheduler = new io.github.fatalitaya.combatnexus.combat.scheduling.internal.WorldCombatScheduler(world);
+        this.time = new io.github.fatalitaya.combatnexus.combat.time.internal.WorldBusinessTimeView(world);
+    }
     public io.github.fatalitaya.combatnexus.combat.driver.api.DriverService drivers() { return world.driverControl().businessView(); }
-    public io.github.fatalitaya.combatnexus.combat.time.api.BusinessTime time() { return new io.github.fatalitaya.combatnexus.combat.time.api.BusinessTime() {
-        public long now(UUID target,NexusId source) { return world.businessTick(target,source); }
-        public long phase(UUID target,NexusId source,long nativePhase) { return world.timeControl().phase(target,source,nativePhase); }
-    }; }
+    public io.github.fatalitaya.combatnexus.combat.time.api.BusinessTime time() { return time; }
     public io.github.fatalitaya.combatnexus.combat.ability.api.AbilityService abilities(){return world.abilities();}
     public java.util.List<io.github.fatalitaya.combatnexus.combat.api.item.EquipmentBindingFact> equipment(UUID actor){return world.equipmentFacts(actor);}
     public UUID session() { return world.sessionId(); }
@@ -86,68 +97,11 @@ public final class WorldServices implements CombatWorld {
         return result;
     }
     public HealingService healing() { return world.healing(); }
-    public io.github.fatalitaya.combatnexus.combat.api.scheduling.CombatScheduler scheduler(){return new io.github.fatalitaya.combatnexus.combat.api.scheduling.CombatScheduler(){
-        public List<io.github.fatalitaya.combatnexus.combat.api.scheduling.ScheduledTask> snapshot(UUID target){var entity=world.level().getEntity(target);return entity instanceof io.github.fatalitaya.combatnexus.combat.state.spi.NativeSchedules nativeTarget?nativeTarget.combatnexus$schedules().snapshot():List.of();}
-        public CommandResult<io.github.fatalitaya.combatnexus.combat.api.scheduling.ScheduledTask> schedule(UUID request,UUID target,io.github.fatalitaya.combatnexus.combat.api.scheduling.ScheduledTask task){
-            return StateCommands.submit(world,request,target,CombatOperation.STATE,Optional.of(task.source()),null,()->{
-                for(var operation : io.github.fatalitaya.combatnexus.combat.internal.registration.IntentTypes.type(task.intent()).permissions()) io.github.fatalitaya.combatnexus.combat.internal.coordination.BridgeExecutions.require(operation);
-                if(!CombatExecutionScope.currentLineage(world.serverSession()).orElseThrow().permissions().containsAll(io.github.fatalitaya.combatnexus.combat.internal.registration.IntentTypes.type(task.intent()).permissions()))return CommandResult.rejected(CommandRejection.Code.INVALID_PHASE,"Scheduled operation exceeds parent permissions");
-                ((io.github.fatalitaya.combatnexus.combat.state.spi.NativeSchedules)world.level().getEntity(target)).combatnexus$schedules().add(task);
-                return CommandResult.applied(task).withJournal(new ApplicationJournal(List.of(ApplicationJournal.Entry.write(ApplicationJournal.Resource.STATE,task.source().id(),0,1,1,true)),true));
-            });
-        }
-        public CommandResult<Boolean> cancel(UUID request,UUID target,UUID task){return StateCommands.submit(world,request,target,CombatOperation.STATE,null,()->CommandResult.applied(((io.github.fatalitaya.combatnexus.combat.state.spi.NativeSchedules)world.level().getEntity(target)).combatnexus$schedules().remove(task)));}
-    };}
-    public io.github.fatalitaya.combatnexus.combat.state.api.RuntimeStates states() { return new io.github.fatalitaya.combatnexus.combat.state.api.RuntimeStates() {
-        public <T> Optional<T> read(io.github.fatalitaya.combatnexus.combat.state.api.StateAddress<T> address) {
-            var entity=world.level().getEntity(address.target());return entity instanceof io.github.fatalitaya.combatnexus.combat.state.spi.NativeRuntimeStates state?state.combatnexus$states().read(address):Optional.empty();
-        }
-        public <T> CommandResult<T> write(UUID request,io.github.fatalitaya.combatnexus.combat.state.api.StateAddress<T> address,CombatSource source,T value) {
-            return StateCommands.submit(world,request,address.target(),CombatOperation.STATE,Optional.of(source),null,()->{
-                var state=((io.github.fatalitaya.combatnexus.combat.state.spi.NativeRuntimeStates)world.level().getEntity(address.target())).combatnexus$states();
-                boolean existed=state.read(address).isPresent();var detached=state.write(address,value);
-                return CommandResult.applied(detached).withJournal(new ApplicationJournal(List.of(ApplicationJournal.Entry.write(ApplicationJournal.Resource.STATE,address.key().id(),existed?1:0,1,1,true)),true));
-            });
-        }
-        public CommandResult<Boolean> remove(UUID request,io.github.fatalitaya.combatnexus.combat.state.api.StateAddress<?> address,CombatSource source) {
-            return StateCommands.submit(world,request,address.target(),CombatOperation.STATE,Optional.of(source),null,()->{
-                boolean removed=((io.github.fatalitaya.combatnexus.combat.state.spi.NativeRuntimeStates)world.level().getEntity(address.target())).combatnexus$states().remove(address);
-                return CommandResult.applied(removed).withJournal(new ApplicationJournal(List.of(ApplicationJournal.Entry.write(ApplicationJournal.Resource.STATE,address.key().id(),removed?1:0,0,removed?1:0,true)),true));
-            });
-        }
-    }; }
-    public io.github.fatalitaya.combatnexus.combat.action.api.EntityCommands entities() { return new io.github.fatalitaya.combatnexus.combat.action.api.EntityCommands() {
-        public CommandResult<Boolean> submit(io.github.fatalitaya.combatnexus.combat.action.api.EntityCommand command) { return submit(command,null); }
-        public CommandResult<Boolean> submit(io.github.fatalitaya.combatnexus.combat.action.api.EntityCommand command,CombatParent parent) {
-            return StateCommands.submit(world,command.requestId(),command.target(),command instanceof io.github.fatalitaya.combatnexus.combat.action.api.EntityCommand.Ignite?CombatOperation.IGNITION:CombatOperation.MOVEMENT,
-                    Optional.of(command.source()),parent,()->io.github.fatalitaya.combatnexus.combat.action.internal.EntityApplication.apply(world.motion(),command));
-        }
-    }; }
+    public io.github.fatalitaya.combatnexus.combat.api.scheduling.CombatScheduler scheduler() { return scheduler; }
+    public io.github.fatalitaya.combatnexus.combat.state.api.RuntimeStates states() { return states; }
+    public io.github.fatalitaya.combatnexus.combat.action.api.EntityCommands entities() { return entities; }
     public io.github.fatalitaya.combatnexus.combat.api.bridge.BridgeCalls bridges() { return world.bridges(); }
-    public io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommands cooldowns() { return new io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommands() {
-        public Optional<io.github.fatalitaya.combatnexus.combat.state.api.CooldownStamp> snapshot(UUID target, NexusId source) {
-            var entity=world.level().getEntity(target);
-            return entity instanceof io.github.fatalitaya.combatnexus.combat.state.spi.NativeCooldownTarget nativeTarget
-                    ? Optional.ofNullable(nativeTarget.combatnexus$cooldowns().get(source)) : Optional.empty();
-        }
-        public long remaining(UUID target, NexusId source, int duration) {
-            if(duration<0) throw new IllegalArgumentException("Negative cooldown duration");
-            return snapshot(target, source).map(stamp -> stamp.remaining(world.businessTick(target, source), duration)).orElse(0L);
-        }
-        public CommandResult<Boolean> submit(io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommand command) { return submit(command, null); }
-        public CommandResult<Boolean> submit(io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommand command, CombatParent parent) {
-            return StateCommands.submit(world, command.requestId(), command.target(), CombatOperation.STATE, Optional.of(command.source()), parent, () -> {
-                var entries=((io.github.fatalitaya.combatnexus.combat.state.spi.NativeCooldownTarget)world.level().getEntity(command.target())).combatnexus$cooldowns();
-                var previous=entries.get(command.source().id());
-                if(command.operation()==io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommand.Operation.START) {
-                    if(previous==null && entries.size()>=64) return CommandResult.rejected(CommandRejection.Code.INVALID_INPUT, "Cooldown source capacity");
-                    entries.put(command.source().id(),new io.github.fatalitaya.combatnexus.combat.state.api.CooldownStamp(world.businessTick(command.target(),command.source().id()),command.deathPolicy()));
-                } else entries.remove(command.source().id());
-                return CommandResult.applied(true).withJournal(new ApplicationJournal(List.of(ApplicationJournal.Entry.write(
-                        ApplicationJournal.Resource.COOLDOWN,command.source().id(),previous==null?0:1,entries.containsKey(command.source().id())?1:0,1,true)),true));
-            });
-        }
-    }; }
+    public io.github.fatalitaya.combatnexus.combat.state.api.CooldownCommands cooldowns() { return cooldowns; }
     public io.github.fatalitaya.combatnexus.combat.projectile.api.ProjectileCommands projectiles() { return new io.github.fatalitaya.combatnexus.combat.projectile.api.ProjectileCommands() {
         public CommandResult<BeforeApplicationPlan.Result> execute(UUID request,UUID shooter,net.minecraft.world.entity.projectile.Projectile projectile,UUID action,BeforeApplicationPlan plan) {
             return StateCommands.submit(world,request,shooter,CombatOperation.PROJECTILE,null,()->{
@@ -272,85 +226,7 @@ public final class WorldServices implements CombatWorld {
         }
     }; }
     public SourceService sources() { return world.sourceInstallations().businessView(); }
-    public EffectCommands effects() { return new EffectCommands() {
-        public EffectResult fact(UUID request, EffectFact fact) {
-            var result = StateCommands.submit(world, request, fact.effect().snapshot().target(), CombatOperation.EFFECT, null, () -> {
-                boolean satisfied;
-                try (var computation = io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.computation()) {
-                    satisfied = io.github.fatalitaya.combatnexus.effect.internal.EffectMappings.satisfied(fact);
-                }
-                return world.effects().bind(new EffectBinding(fact.effect(), satisfied, fact.stacking())) ? CommandResult.applied(satisfied)
-                    : CommandResult.<Boolean>rejected(CommandRejection.Code.IMMUNE, "Condition binding refused");
-            });
-            return new EffectResult(result.applied() ? (result.value().orElseThrow() ? EffectResult.Outcome.APPLIED : EffectResult.Outcome.REMOVED)
-                : EffectResult.Outcome.REJECTED, result.rejection(), result.journal(), result.context());
-        }
-        public CommandResult<Integer> clear(UUID request, UUID target) {
-            return StateCommands.submit(world, request, target, CombatOperation.EFFECT, null, () -> {
-                int removed = 0;
-                for (var effect : world.effects().snapshot(target)) if (effect.policy().dispellable()) {
-                    var s = effect.snapshot(); world.effects().remove(target, s.effect(), s.source(), EffectService.Removal.DISPELLED); removed++;
-                }
-                return CommandResult.applied(removed);
-            });
-        }
-        public CommandResult<Boolean> remove(UUID request, UUID target, NexusId effect, NexusId source, EffectService.Removal reason) {
-            return StateCommands.submit(world, request, target, CombatOperation.EFFECT, null, () -> {
-                world.effects().remove(target, effect, source, reason); return CommandResult.applied(true);
-            });
-        }
-        public CommandResult<NativeEffectReceipt> nativeEffect(NativeEffectCommand command) { return nativeEffect(command, null); }
-        public CommandResult<NativeEffectReceipt> nativeEffect(NativeEffectCommand command, CombatParent parent) {
-            return StateCommands.submit(world, command.requestId(), command.target(), CombatOperation.EFFECT, Optional.of(command.source()), parent,
-                    () -> io.github.fatalitaya.combatnexus.effect.internal.NativeEffects.apply((LivingEntity) world.level().getEntity(command.target()), command));
-        }
-        public List<EffectView> snapshot(UUID target) {
-            return facts(target).map(f -> f.facts().effectViews()).orElse(List.of());
-        }
-        public EffectResult apply(EffectApplication request) { return apply(request, null); }
-        public EffectResult bind(UUID request, EffectBinding binding) { return bind(request, binding, null); }
-        public EffectResult bind(UUID request, EffectBinding binding, CombatParent parent) {
-            var result = StateCommands.submit(world, request, binding.effect().snapshot().target(), CombatOperation.EFFECT, parent,
-                    () -> world.effects().bind(binding) ? CommandResult.applied(true)
-                        : CommandResult.<Boolean>rejected(CommandRejection.Code.IMMUNE, "Effect binding rejected"));
-            return new EffectResult(result.applied() ? (binding.satisfied() ? EffectResult.Outcome.APPLIED : EffectResult.Outcome.REMOVED)
-                    : EffectResult.Outcome.REJECTED, result.rejection(), result.journal(), result.context());
-        }
-        public EffectResult apply(EffectApplication request, CombatParent parent) {
-            var result = StateCommands.submit(world, request.requestId(), request.effect().snapshot().target(), CombatOperation.EFFECT, parent, () -> {
-                if (request.effect().ownership() != io.github.fatalitaya.combatnexus.effect.api.EffectOwnership.MANAGED)
-                    return CommandResult.<Boolean>rejected(CommandRejection.Code.INVALID_INPUT, "Observed effects are not installable");
-                if (request.effect().snapshot().lifetime() == EffectLifetime.Kind.INSTANT)
-                    return world.effects().applyInstant(request.effect());
-                var expiry = request.effect().snapshot().expiresAtTick();
-                if (expiry.isPresent() && expiry.getAsLong() <= world.businessTick(request.effect().snapshot().target(), request.effect().snapshot().source()))
-                    return CommandResult.<Boolean>rejected(CommandRejection.Code.EXPIRED, "Effect duration already elapsed");
-                try { return world.effects().apply(request.effect(), request.stacking()) ? CommandResult.applied(true)
-                    : CommandResult.<Boolean>rejected(CommandRejection.Code.IMMUNE, "Effect immunity rejected application"); }
-                catch (RuntimeException failure) {
-                    return CommandResult.<Boolean>rejected(CommandRejection.Code.INCOMPLETE_APPLICATION, "Effect contribution incomplete");
-                }
-            });
-            return new EffectResult(result.applied() ? EffectResult.Outcome.APPLIED : EffectResult.Outcome.REJECTED, result.rejection(), result.journal(), result.context());
-        }
-        public EffectResult dispel(UUID request, EffectView effect) { return dispel(request, effect, null); }
-        public EffectResult dispel(UUID request, EffectView effect, CombatParent parent) {
-            var result = StateCommands.submit(world, request, effect.target(), CombatOperation.EFFECT, parent, () -> {
-                var current = snapshot(effect.target()).stream().filter(e -> e.definition().equals(effect.definition()) && e.source().equals(effect.source()) && e.ownership() == effect.ownership()).findFirst();
-                if (current.isEmpty()) return CommandResult.<Boolean>rejected(CommandRejection.Code.NOT_FOUND, "Effect absent");
-                if (!current.get().operations().contains(EffectView.Operation.DISPEL)) return CommandResult.<Boolean>rejected(CommandRejection.Code.NOT_DISPELLABLE, "Owner rejects dispel");
-                if (effect.ownership() == io.github.fatalitaya.combatnexus.effect.api.EffectOwnership.MANAGED)
-                    world.effects().remove(effect.target(), effect.definition(), effect.source().orElseThrow(), EffectService.Removal.DISPELLED);
-                else {
-                    var entity = (LivingEntity)world.level().getEntity(effect.target());
-                    var holder = ContentAccess.get().effect(effect.definition()).orElseThrow();
-                    if (!entity.removeEffect(holder)) return CommandResult.<Boolean>rejected(CommandRejection.Code.NOT_DISPELLABLE, "Native removal refused");
-                }
-                return CommandResult.applied(true);
-            });
-            return new EffectResult(result.applied() ? EffectResult.Outcome.REMOVED : EffectResult.Outcome.REJECTED, result.rejection(), result.journal(), result.context());
-        }
-    }; }
+    public EffectCommands effects() { return effects; }
     public ShieldCommands shields() { return new ShieldCommands() {
         public List<ShieldPoolSnapshot> snapshot(UUID target) { return world.shields().snapshot(target); }
         public CommandResult<ShieldGrantReceipt> grant(UUID request, UUID target, ShieldGrant grant) { return grant(request, target, grant, null); }

@@ -5,6 +5,7 @@ import io.github.fatalitaya.combatnexus.combat.healing.api.HealingService;
 
 /** Composition-root lifecycle contract; not a Java security sandbox. */
 public interface EffectServiceControl extends EffectService {
+    void restoring(boolean value);
     void suspend(UUID target, io.github.fatalitaya.combatnexus.api.id.NexusId source, boolean suspended);
     boolean suspended(UUID target, io.github.fatalitaya.combatnexus.api.id.NexusId source);
     Set<io.github.fatalitaya.combatnexus.api.id.NexusId> persistentSources(UUID target);

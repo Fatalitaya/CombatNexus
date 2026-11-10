@@ -40,5 +40,7 @@ public interface CombatRegistrar {
     void sourceProvider(NexusId id, int priority, io.github.fatalitaya.combatnexus.combat.api.source.SourceProvider provider);
     <T extends io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorComponent> void behavior(io.github.fatalitaya.combatnexus.combat.api.behavior.BehaviorType<T> type);
     void observeShield(NexusId id, int priority, Consumer<ShieldSettlement> observer);
+    void observeAbility(NexusId id,int priority,Consumer<io.github.fatalitaya.combatnexus.combat.ability.api.AbilityFact> observer);
+    void reactAbility(NexusId id,int priority,java.util.Set<io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation> permissions,Consumer<io.github.fatalitaya.combatnexus.combat.api.transaction.CombatCallback<io.github.fatalitaya.combatnexus.combat.ability.api.AbilityFact>> reaction);
     void observeState(NexusId id, int priority, Consumer<CommandResult<?>> observer);
 }

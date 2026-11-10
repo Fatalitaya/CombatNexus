@@ -12,10 +12,13 @@ spec.loader.exec_module(runtime)
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, required=True)
 parser.add_argument('--run-directory', type=Path, required=True)
+parser.add_argument("--target", choices=["neoforge-26.1.2", "neoforge-1.21.1"], default="neoforge-26.1.2")
 args = parser.parse_args()
 checks = []
 PREFIX = '''function cls(n){return Java.loadClass("io.github.fatalitaya.combatnexus."+n);}var Id=cls("api.id.NexusId"),List=Java.loadClass("java.util.List"),s=AutoJS.server(),level=s.overworld(),world=cls("combat.internal.platform.PlatformWorldLifecycle").existing(level),d=cls("combat.internal.definition.CombatDefinitions").forRuntime(cls("combat.internal.transaction.CombatServerRuntime").of(s));function id(n){return Id.parse(n.indexOf(":")>=0?n:"combatnexus_effect_probe:"+n);}'''
 def evaluate(code):
+    if args.target == "neoforge-1.21.1":
+        code = code.replace('.entityTags()', '.getTags()').replace(',Java.loadClass("net.minecraft.world.entity.EntitySpawnReason").COMMAND', '').replace('.ITEM.getValue(', '.ITEM.get(').replace('.hurtServer(level,', '.hurt(')
     return runtime.evaluate(args.port, '(function(){' + PREFIX + code + '})()')
 def state():
     return evaluate('''var item=new (Java.loadClass("net.minecraft.world.item.ItemStack"))(Java.loadClass("net.minecraft.world.item.Items").STICK);var refs=d.bindings(new (cls("combat.damage.platform.item.NativeRuleItem"))(item));var names=[];for(var binding of refs.bindings())names.push(String(binding.id()));return JSON.stringify({generation:d.generation(),amount:d.domains().effects().get(id("java_effect")).behavior().components().get(0).amount(),bindings:names});''')
@@ -28,7 +31,7 @@ pack_root = args.run_directory / 'world/datapacks'
 with tempfile.TemporaryDirectory(prefix='item-binding-', dir=pack_root) as directory:
     pack = Path(directory)
     name = 'file/' + pack.name
-    (pack / 'pack.mcmeta').write_text(json.dumps({'pack': {'description': 'Binding verification', 'min_format': [101, 1], 'max_format': [101, 1]}}))
+    (pack / 'pack.mcmeta').write_text(json.dumps({'pack': {'description': 'Binding verification', **({'pack_format': 48} if args.target == 'neoforge-1.21.1' else {'min_format': [101, 1], 'max_format': [101, 1]})}}))
     def write(path, value):
         file = pack / ('data/' + path + '.json')
         file.parent.mkdir(parents=True, exist_ok=True)

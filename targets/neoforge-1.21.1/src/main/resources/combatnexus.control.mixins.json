@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.fatalitaya.combatnexus.combat.control.platform",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "LivingControlMixin",
+    "EntityControlMixin",
+    "PlayerControlMixin",
+    "MobControlMixin",
+    "ServerControlMixin",
+    "SpellControlMixin",
+    "WorldLifecycleMixin",
+    "ServerRuntimeMixin",
+    "ParticipantIdentityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "client": [
+    "ClientInputControlMixin"
+  ]
+}

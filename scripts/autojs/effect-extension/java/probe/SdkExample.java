@@ -59,7 +59,7 @@ public final class SdkExample {
                 0,
                 EffectLifetime.timed(1200000),
                 EffectService.Stacking.REPLACE,
-                new EffectPolicy(EffectPolicy.Category.NEUTRAL, true, tags),
+                new EffectPolicy(EffectPolicy.Category.NEUTRAL, true, tags,io.github.fatalitaya.combatnexus.effect.api.EffectControl.NONE,io.github.fatalitaya.combatnexus.effect.api.EffectApplicationPolicy.NORMAL),
                 attributes,
                 plan,
                 Set.of());

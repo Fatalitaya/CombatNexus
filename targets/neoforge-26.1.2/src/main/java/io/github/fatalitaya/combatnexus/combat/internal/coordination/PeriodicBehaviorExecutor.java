@@ -127,7 +127,7 @@ final class PeriodicBehaviorExecutor {
         }
         public io.github.fatalitaya.combatnexus.combat.api.input.CombatInputFrame input() {
             check();
-            return new io.github.fatalitaya.combatnexus.combat.internal.WorldServices(world).facts(source.target()).orElseThrow();
+            return world.services().facts(source.target()).orElseThrow();
         }
         public io.github.fatalitaya.combatnexus.combat.api.CommandOutcome<?> execute(io.github.fatalitaya.combatnexus.combat.api.scheduling.ScheduledIntent intent) {
             check();return io.github.fatalitaya.combatnexus.combat.internal.transaction.DomainCommandExecutor.execute(world,

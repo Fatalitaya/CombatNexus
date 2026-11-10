@@ -44,6 +44,12 @@ public final class EffectTooltip {
         details.add(0, text("level", displayedLevel));
         source.ifPresent(value -> details.add(text("source", value)));
         details.add(text("stacking." + definition.stacking().getPath()));
+        var control=instance.map(EffectView::control).orElse(definition.policy().control());
+        control.categories().stream().sorted().forEach(category->details.add(text("control",text("control_category."+category.name().toLowerCase(Locale.ROOT)))));
+        control.immuneCategories().stream().sorted().forEach(category->summary.add(text("control_immunity",text("control_category."+category.name().toLowerCase(Locale.ROOT)))));
+        control.immuneEffects().stream().sorted().forEach(effect->summary.add(text("effect_immunity",effect.toString())));
+        control.immuneTags().stream().sorted().forEach(tag->summary.add(text("tag_immunity",tag.toString())));
+        if(instance.map(EffectView::application).orElse(definition.policy().application())==EffectApplicationPolicy.FORCE)details.add(text("forced"));
         details.add(text(definition.policy().dispellable() ? "dispellable" : "not_dispellable"));
         return new TooltipBlock(GeneratedTexts.translatableWithFallback("effect." + id.getNamespace() + "." + id.getPath().replace('/', '.'), id.getPath().replace('_', ' ')), summary, details);
     }

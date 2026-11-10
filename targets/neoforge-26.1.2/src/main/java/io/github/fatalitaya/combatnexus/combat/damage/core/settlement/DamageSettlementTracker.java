@@ -211,6 +211,12 @@ public final class DamageSettlementTracker {
         }
         return java.util.OptionalLong.empty();
     }
+    public static void recordItemBlock(LivingEntity target, DamageSource source,
+            io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt receipt) {
+        var scope = matchingScope(target, source);
+        if (scope != null && scope.state != null) scope.state.recordItemBlock(receipt);
+    }
+
     public static void recordProtection(LivingEntity target, DamageSource source,
             java.util.List<io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal.Entry> entries) {
         var scope = matchingScope(target, source);

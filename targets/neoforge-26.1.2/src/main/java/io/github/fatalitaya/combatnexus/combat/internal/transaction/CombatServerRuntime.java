@@ -12,6 +12,20 @@ import java.util.function.IntSupplier;
 
 /** One execution kernel per server session; world services share its quotas and completion FIFO. */
 public final class CombatServerRuntime implements AutoCloseable {
+    public record ProcessorFailure(io.github.fatalitaya.combatnexus.api.id.NexusId processor,
+            io.github.fatalitaya.combatnexus.combat.damage.api.enums.DamagePhase phase,
+            String callback, long request, String exceptionType, String message) {}
+    private final Deque<ProcessorFailure> processorFailures = new ArrayDeque<>();
+    public List<ProcessorFailure> processorFailures() { requireThread(); return List.copyOf(processorFailures); }
+    public void recordProcessorFailure(io.github.fatalitaya.combatnexus.api.id.NexusId processor,
+            io.github.fatalitaya.combatnexus.combat.damage.api.enums.DamagePhase phase, String callback, long request, Exception failure) {
+        requireThread();
+        String message = failure.getMessage();
+        if (message == null) message = "";
+        if (message.length() > 512) message = message.substring(0, 509) + "...";
+        if (processorFailures.size() == 128) processorFailures.removeFirst();
+        processorFailures.addLast(new ProcessorFailure(processor, phase, callback, request, failure.getClass().getName(), message));
+    }
     private volatile CombatLimits configuredLimits = CombatLimits.DEFAULT;
     private final ServerSession session;
     private final BooleanSupplier owningThread;
@@ -60,7 +74,7 @@ public final class CombatServerRuntime implements AutoCloseable {
         if (tickets.containsKey(lineage)) throw new IllegalStateException("Operation already admitted");
         var slots = new ArrayDeque<CombatCompletionQueue.Slot>();
         try {
-            for (int index = 0; index < (lineage.operation() == CombatOperation.DAMAGE ? 2 : 1); index++)
+            for (int index = 0; index < (lineage.operation() == CombatOperation.ABILITY ? 4 : lineage.operation() == CombatOperation.DAMAGE ? 2 : 1); index++)
                 slots.addLast(completions.reserve());
         } catch (IllegalStateException exhausted) {
             slots.forEach(CombatCompletionQueue.Slot::close);
@@ -229,6 +243,7 @@ public final class CombatServerRuntime implements AutoCloseable {
         for (CombatRuntime world : List.copyOf(worlds.values())) io.github.fatalitaya.combatnexus.combat.spi.CombatWorldLifecycleAccess.close(world);
         worlds.clear();
         completions.clear();
+        processorFailures.clear();
         definitions = null;
         tickets.values().forEach(value -> value.active = false);
         tickets.clear();

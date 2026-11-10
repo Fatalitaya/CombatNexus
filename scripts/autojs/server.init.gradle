@@ -1,14 +1,21 @@
 allprojects {
     afterEvaluate {
-        if (projectDir.name == 'neoforge-26.1.2') {
+        if (projectDir.name in ['neoforge-26.1.2', 'neoforge-1.21.1']) {
             // Core acceptance scripts use AutoJS's native Rhino bindings, not KubeJS remappings.
             configurations.runtimeClasspath {
                 exclude group: 'curse.maven', module: 'kubejs-238086'
+                exclude group: 'curse.maven', module: 'lendercataclysm-551586'
+                exclude group: 'curse.maven', module: 'lionfish-api-1001614'
+                exclude group: 'curse.maven', module: 'curios-309927'
             }
             if (providers.gradleProperty('verificationPackaged').map { it.toBoolean() }.getOrElse(false)) {
                 configurations.runtimeOnly.dependencies.removeIf { it instanceof ProjectDependency && it.path == ':combatnexus_compat' }
                 dependencies.add('runtimeOnly', files(tasks.named('jar')))
                 neoForge.runs.server.loadedMods = []
+                tasks.named('runServer', JavaExec).configure {
+                    def packagedClasspath = project.files(classpathProvider.from.toArray())
+                    classpathProvider.setFrom(packagedClasspath.minus(sourceSets.main.output))
+                }
             }
             if (!providers.gradleProperty('verificationCompatibility').map { it.toBoolean() }.getOrElse(false)
                     && !providers.gradleProperty('verificationAttributesOnly').map { it.toBoolean() }.getOrElse(false)) {
@@ -17,6 +24,9 @@ allprojects {
                     exclude group: 'curse.maven', module: 'apothic-attributes-898963'
                     exclude group: 'curse.maven', module: 'placebo-283644'
                 }
+            }
+            if (providers.gradleProperty('verificationAttributesOnly').map { it.toBoolean() }.getOrElse(false)) {
+                configurations.runtimeClasspath { exclude group: 'curse.maven', module: 'apotheosis-313970' }
             }
             neoForge.runs.server {
                 environment 'COMBATNEXUS_VERIFICATION_FROZEN', providers.gradleProperty('verificationFrozen').getOrElse('false')

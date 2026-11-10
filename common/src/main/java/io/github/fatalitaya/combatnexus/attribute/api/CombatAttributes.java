@@ -40,12 +40,12 @@ public final class CombatAttributes {
     private CombatAttributes() {}
 
     // Reuse vanilla identities; never register synonymous attributes.
-    public static NexusId attackDamage() { return NexusId.withDefaultNamespace("attack_damage"); }
-    public static NexusId attackSpeed() { return NexusId.withDefaultNamespace("attack_speed"); }
-    public static NexusId movementSpeed() { return NexusId.withDefaultNamespace("movement_speed"); }
-    public static NexusId armor() { return NexusId.withDefaultNamespace("armor"); }
-    public static NexusId armorToughness() { return NexusId.withDefaultNamespace("armor_toughness"); }
-    public static NexusId maxHealth() { return NexusId.withDefaultNamespace("max_health"); }
+    public static NexusId attackDamage() { return io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.get().vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla.ATTACK_DAMAGE); }
+    public static NexusId attackSpeed() { return io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.get().vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla.ATTACK_SPEED); }
+    public static NexusId movementSpeed() { return io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.get().vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla.MOVEMENT_SPEED); }
+    public static NexusId armor() { return io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.get().vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla.ARMOR); }
+    public static NexusId armorToughness() { return io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.get().vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla.ARMOR_TOUGHNESS); }
+    public static NexusId maxHealth() { return io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.get().vanilla(io.github.fatalitaya.combatnexus.attribute.spi.AttributeCatalog.Vanilla.MAX_HEALTH); }
 
     /** Business identities are available independently of native registration. */
     public static NexusId critChance() { return CRIT_CHANCE; }

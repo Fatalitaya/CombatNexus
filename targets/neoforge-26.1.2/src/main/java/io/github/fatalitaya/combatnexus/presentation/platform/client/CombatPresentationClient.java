@@ -26,6 +26,7 @@ public final class CombatPresentationClient {
     private static UUID session;
     private static long generation;
     private CombatPresentationClient() {}
+    static long generation() { return generation; }
     public static void keys(RegisterKeyMappingsEvent event) { event.register(PANEL); }
     public static void register(RegisterClientPayloadHandlersEvent event) {
         CombatControlClient.register();
@@ -77,10 +78,11 @@ public final class CombatPresentationClient {
         if (mc.screen instanceof CombatPanelScreen screen) {
             var target = screen.target();
             if (target.level() != mc.level || target.isRemoved()) { mc.setScreen(null); return; }
+            ClientEntityCombatMirrors.subscribe(target);
             var refusal = ClientEntityCombatMirrors.refusal(target);
             if (refusal.isPresent()) screen.reject(refusal.get());
             else screen.accept(ClientEntityCombatMirrors.rows(target));
-        }
+        } else ClientEntityCombatMirrors.clear();
     }
     public static void open(net.minecraft.world.entity.LivingEntity target) {
         var mc = Minecraft.getInstance();

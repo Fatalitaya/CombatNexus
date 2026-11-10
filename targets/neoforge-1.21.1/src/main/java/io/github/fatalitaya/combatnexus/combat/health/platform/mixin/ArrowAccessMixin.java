@@ -1,0 +1,9 @@
+package io.github.fatalitaya.combatnexus.combat.health.platform.mixin;
+import io.github.fatalitaya.combatnexus.combat.projectile.spi.NativeArrow;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
+@Mixin(AbstractArrow.class)
+public interface ArrowAccessMixin extends NativeArrow {
+    @Accessor("baseDamage") double combatnexus$baseDamage();
+}

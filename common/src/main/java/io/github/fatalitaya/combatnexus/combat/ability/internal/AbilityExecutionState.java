@@ -17,14 +17,23 @@ public final class AbilityExecutionState {
     record Cooldown(UUID actor, String key, NexusId clock) {}
 
     static final class Execution {
-        final AbilityRequest request;
+        AbilityRequest request;
         final CombatAction action;
         List<ParticipantIdentity> targets;
         boolean restored;
         final DriverScope scope;
+        AbilityDefinition definition;
+        List<Cooldown> cooldownSlots=List.of();
+        boolean cooldownFinished;
+        boolean released;
+        boolean terminalPublished;
         final List<AbilitySnapshot.CommandEvidence> commands = new ArrayList<>();
         AbilityParameters state = AbilityParameters.EMPTY;
         int step;
+        AbilityExecution.Invocation invocation=AbilityExecution.Invocation.FIRST;
+        AbilitySnapshot.Waiting waiting=AbilitySnapshot.Waiting.NONE;
+        int remainingInputs;
+        Optional<AbilitySnapshot.CloseReason> closeReason=Optional.empty();
         AbilitySnapshot.Status status = AbilitySnapshot.Status.RUNNING;
         OptionalLong next = OptionalLong.empty();
 
@@ -42,11 +51,19 @@ public final class AbilityExecutionState {
         void waiting(AbilityContinuation continuation, long now) {
             if (step >= 63)
                 throw new IllegalStateException("Ability continuation capacity exceeded");
+            waiting=AbilitySnapshot.Waiting.DELAY;remainingInputs=0;
             state = continuation.state();
             next = OptionalLong.of(Math.addExact(now, continuation.delayTicks()));
             status = AbilitySnapshot.Status.WAITING;
         }
 
+        void awaitInput(AbilityStepResult.AwaitInput window,long now) {
+            if(step>=63)throw new IllegalStateException("Ability step capacity exceeded");
+            if(invocation!=AbilityExecution.Invocation.INPUT){
+                remainingInputs=window.attempts();next=OptionalLong.of(Math.addExact(now,window.ticks()));
+            }else remainingInputs=Math.min(remainingInputs,window.attempts());
+            state=window.state();waiting=AbilitySnapshot.Waiting.INPUT;status=AbilitySnapshot.Status.WAITING;
+        }
         boolean mayResume(UUID actor, int nextStep) {
             return request.grant().actor().entity().equals(actor)
                     && status == AbilitySnapshot.Status.WAITING
@@ -60,7 +77,7 @@ public final class AbilityExecutionState {
         }
 
         void terminate(AbilitySnapshot.Status terminal) {
-            status = terminal;
+            status = terminal;waiting=AbilitySnapshot.Waiting.NONE;remainingInputs=0;
             next = OptionalLong.empty();
         }
 
@@ -70,12 +87,12 @@ public final class AbilityExecutionState {
 
         void failed() {
             terminate(
-                    hasWrites() ? AbilitySnapshot.Status.PARTIAL : AbilitySnapshot.Status.UNKNOWN);
+                    (hasWrites()||released) ? AbilitySnapshot.Status.PARTIAL : AbilitySnapshot.Status.UNKNOWN);
         }
 
         void refused() {
             terminate(
-                    hasWrites() ? AbilitySnapshot.Status.PARTIAL : AbilitySnapshot.Status.REJECTED);
+                    (hasWrites()||released) ? AbilitySnapshot.Status.PARTIAL : AbilitySnapshot.Status.REJECTED);
         }
 
         boolean record(CommandOutcome<?> result) {
@@ -101,11 +118,11 @@ public final class AbilityExecutionState {
                             new CombatAction(entry.action(), world, grant.actor().entity()),
                             List.of(),
                             entry.scope());
-            execution.restored = true;
+            execution.restored = true;execution.released=entry.released();
             execution.state = entry.state();
             execution.step = entry.step();
             execution.commands.addAll(entry.commands());
-            execution.status = AbilitySnapshot.Status.WAITING;
+            execution.status = AbilitySnapshot.Status.WAITING;execution.waiting=AbilitySnapshot.Waiting.DELAY;
             execution.next = OptionalLong.of(Math.addExact(now, entry.remaining()));
             return execution;
         }
@@ -127,7 +144,7 @@ public final class AbilityExecutionState {
                     scope,
                     Math.max(0, next.orElseThrow() - now),
                     commands,
-                    samples);
+                    samples,released);
         }
 
         AbilitySnapshot snapshot() {
@@ -139,7 +156,7 @@ public final class AbilityExecutionState {
                     step,
                     status,
                     commands,
-                    next);
+                    next,waiting,remainingInputs,closeReason);
         }
     }
 
@@ -147,26 +164,29 @@ public final class AbilityExecutionState {
         return new Key(grant.actor().entity(), grant.source().instance(), grant.contribution());
     }
 
-    static Cooldown cooldown(AbilityGrant grant, AbilityDefinition definition, NexusId sourceKey) {
-        return definition
-                .sharedCooldown()
-                .map(
-                        group ->
-                                new Cooldown(
-                                        grant.actor().entity(),
-                                        "shared/" + group,
-                                        new NexusId(
-                                                "combatnexus",
-                                                "ability_cooldown/"
-                                                        + group.namespace()
-                                                        + "/"
-                                                        + group.path())))
-                .orElseGet(
-                        () ->
-                                new Cooldown(
-                                        grant.actor().entity(),
-                                        grant.source().instance() + "/" + grant.contribution(),
-                                        sourceKey));
+    static AbilityCooldownSlot independent(AbilityGrant grant,AbilityDefinition definition) {
+        return definition.cooldownOwner()==AbilityDefinition.CooldownOwner.PLAYER_SKILL
+            ? new AbilityCooldownSlot.Skill(grant.ability())
+            : new AbilityCooldownSlot.Contribution(grant.source().instance(),grant.contribution());
+    }
+    static String slotKey(AbilityCooldownSlot slot) {
+        if(slot instanceof AbilityCooldownSlot.Skill skill)return "skill/"+skill.ability();
+        if(slot instanceof AbilityCooldownSlot.Shared shared)return "shared/"+shared.group();
+        var contribution=(AbilityCooldownSlot.Contribution)slot;
+        return "source/"+contribution.source()+"/"+contribution.contribution();
+    }
+    static Cooldown cooldown(UUID actor,AbilityCooldownSlot slot,NexusId sourceClock) {
+        String key=slotKey(slot);
+        NexusId clock=sourceClock;
+        if(slot instanceof AbilityCooldownSlot.Skill skill)clock=new NexusId("combatnexus","ability_cooldown/skill/"+skill.ability().namespace()+"/"+skill.ability().path());
+        if(slot instanceof AbilityCooldownSlot.Shared shared)clock=new NexusId("combatnexus","ability_cooldown/shared/"+shared.group().namespace()+"/"+shared.group().path());
+        return new Cooldown(actor,key,clock);
+    }
+    static List<Cooldown> cooldowns(AbilityGrant grant,AbilityDefinition definition,NexusId sourceClock) {
+        var result=new ArrayList<Cooldown>();
+        result.add(cooldown(grant.actor().entity(),independent(grant,definition),sourceClock));
+        definition.sharedCooldown().ifPresent(group->result.add(cooldown(grant.actor().entity(),new AbilityCooldownSlot.Shared(group),sourceClock)));
+        return List.copyOf(result);
     }
 
     long remaining(Cooldown key, long now) {
@@ -195,12 +215,13 @@ public final class AbilityExecutionState {
                                         Math.max(
                                                 0,
                                                 e.getValue()
-                                                        - clock.applyAsLong(e.getKey().clock()))))
+                                                        - clock.applyAsLong(e.getKey().clock())),clearOnDeath.contains(e.getKey())))
                 .filter(e -> e.remaining() > 0)
                 .toList();
     }
 
     void restoreCooldown(UUID actor, SavedAbilityCooldown saved, long now) {
+        if(saved.clearOnDeath())clearOnDeath.add(new Cooldown(actor,saved.key(),saved.clock()));
         cooldowns.put(
                 new Cooldown(actor, saved.key(), saved.clock()),
                 cooldownDeadline(now, saved.remaining()));
@@ -214,9 +235,11 @@ public final class AbilityExecutionState {
                     && execution.status != AbilitySnapshot.Status.RUNNING) iterator.remove();
         }
         cooldowns.entrySet().removeIf(e -> e.getValue() <= clock.applyAsLong(e.getKey()));
+        clearOnDeath.retainAll(cooldowns.keySet());
     }
 
     final Map<Key, AbilityGrant> grants = new LinkedHashMap<>();
     final Map<Cooldown, Long> cooldowns = new HashMap<>();
+    final Set<Cooldown> clearOnDeath = new HashSet<>();
     final Map<UUID, Execution> executions = new LinkedHashMap<>();
 }

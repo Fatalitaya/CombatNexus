@@ -7,6 +7,16 @@ import io.github.fatalitaya.combatnexus.combat.api.*;
 /** Value-only scheduled commands; no Runnable, entity, callback or execution permit can be retained. */
 public interface ScheduledIntent {
     Codec<ScheduledIntent> CODEC = io.github.fatalitaya.combatnexus.combat.internal.registration.IntentCodecs.CODEC;
+    record Knockback(double strength, double x, double z) implements ScheduledIntent {
+        public static final MapCodec<Knockback> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.DOUBLE.fieldOf("strength").forGetter(Knockback::strength),
+                Codec.DOUBLE.fieldOf("x").forGetter(Knockback::x),
+                Codec.DOUBLE.fieldOf("z").forGetter(Knockback::z)).apply(i, Knockback::new));
+        public Knockback {
+            if (!Double.isFinite(strength) || strength < 0 || !Double.isFinite(x) || !Double.isFinite(z))
+                throw new IllegalArgumentException("Invalid scheduled knockback");
+        }
+    }
     record Heal(double amount,io.github.fatalitaya.combatnexus.combat.healing.api.HealingRequest.Reason reason) implements ScheduledIntent {
         public static final MapCodec<Heal> CODEC=RecordCodecBuilder.mapCodec(i->i.group(Codec.DOUBLE.fieldOf("amount").forGetter(Heal::amount),Codec.STRING.xmap(io.github.fatalitaya.combatnexus.combat.healing.api.HealingRequest.Reason::valueOf,Enum::name).fieldOf("reason").forGetter(Heal::reason)).apply(i,Heal::new));
         public Heal { if(!Double.isFinite(amount)||amount<0)throw new IllegalArgumentException("Invalid scheduled healing");Objects.requireNonNull(reason); }

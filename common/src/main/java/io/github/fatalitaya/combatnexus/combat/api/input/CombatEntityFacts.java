@@ -19,13 +19,13 @@ public final class CombatEntityFacts {
     private final io.github.fatalitaya.combatnexus.effect.api.EffectFacts effects;
     public CombatEntityFacts(io.github.fatalitaya.combatnexus.api.entity.EntityTypeFacts entityType, io.github.fatalitaya.combatnexus.api.entity.EntityCategory category,
             float health, float maxHealth, boolean onFire, FrozenFacts external, ItemFacts weapon,
-            int chargeTicks, float attackStrength, Map<EquipmentPosition, ItemFacts> equipment,
+            int chargeTicks, float attackStrength, Map<EquipmentPosition, ItemFacts> equipment, Set<EquipmentPosition> availableSlots,
             io.github.fatalitaya.combatnexus.effect.api.EffectFacts effects) {
         this.category = Objects.requireNonNull(category); this.entityType = Objects.requireNonNull(entityType); this.health = health; this.maxHealth = maxHealth;
         this.onFire = onFire; this.external = Objects.requireNonNull(external); this.weapon = Objects.requireNonNull(weapon);
         this.chargeTicks = chargeTicks; this.attackStrength = attackStrength; this.effects = Objects.requireNonNull(effects);
-        if (!equipment.keySet().equals(Set.of(EquipmentPosition.values()))) throw new IllegalArgumentException("Incomplete frozen equipment");
-        this.equipment.putAll(equipment);
+        if (!equipment.keySet().equals(Set.copyOf(availableSlots))) throw new IllegalArgumentException("Incomplete frozen equipment");
+        this.equipment.putAll(Map.copyOf(equipment));
     }
     public io.github.fatalitaya.combatnexus.combat.damage.api.context.DamageParticipantFacts ruleFacts() {
         return new io.github.fatalitaya.combatnexus.combat.damage.api.context.DamageParticipantFacts(entityType, category, health, maxHealth, onFire,

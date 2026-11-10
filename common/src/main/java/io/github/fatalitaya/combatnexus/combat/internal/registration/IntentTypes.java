@@ -11,6 +11,7 @@ public final class IntentTypes {
     private static boolean frozen;
     private IntentTypes() {}
     public static void builtins() {
+        add("knockback",ScheduledIntent.Knockback.class,ScheduledIntent.Knockback.CODEC,CombatOperation.MOVEMENT,(v,c)->c.submit(new DomainCommand.Entity(new io.github.fatalitaya.combatnexus.combat.action.api.EntityCommand.Knockback(UUID.randomUUID(),c.target(),c.source(),v.strength(),v.x(),v.z()))));
         add("healing",ScheduledIntent.Heal.class,ScheduledIntent.Heal.CODEC,CombatOperation.HEALING,(v,c)->c.submit(new DomainCommand.Heal(new io.github.fatalitaya.combatnexus.combat.healing.api.HealingRequest(UUID.randomUUID(),c.target(),c.source(),v.reason(),v.amount()))));
         add("effect",ScheduledIntent.Effect.class,ScheduledIntent.Effect.CODEC,CombatOperation.EFFECT,(v,c)->c.submit(new DomainCommand.Effect(new io.github.fatalitaya.combatnexus.effect.api.NativeEffectCommand(UUID.randomUUID(),c.target(),c.source(),v.effect(),io.github.fatalitaya.combatnexus.effect.api.NativeEffectCommand.Operation.APPLY,v.duration(),v.amplifier(),false,true,true))));
         add("ignition",ScheduledIntent.Ignite.class,ScheduledIntent.Ignite.CODEC,CombatOperation.IGNITION,(v,c)->c.submit(new DomainCommand.Entity(new io.github.fatalitaya.combatnexus.combat.action.api.EntityCommand.Ignite(UUID.randomUUID(),c.target(),c.source(),v.ticks()))));

@@ -31,6 +31,18 @@
   var victim=Java.loadClass("net.minecraft.world.entity.EntityType").COW.create(level,Java.loadClass("net.minecraft.world.entity.EntitySpawnReason").COMMAND);victim.setPos(2,512,0);victim.setNoAi(true);victim.setNoGravity(true);level.addFreshEntity(victim);cls("combat.platform.CombatPersistence").tick(level);
   try{var beforeHealth=victim.getHealth();victim.hurtServer(level,entity.damageSources().mobAttack(entity),1);check(Math.abs(victim.getHealth()-(beforeHealth-4))<.001,"selected mixed affix damage contribution executes through the native damage pipeline");}finally{Life.clear(world,victim.getUUID(),cls("effect.api.EffectService$Removal").WORLD_EXIT);victim.discard();}
   var installation=world.equipmentSelection(entity.getUUID()).candidates().get(0).installation(),poolSource=pools().get(0).source().id(),deadline=pools().get(0).expiresAtTick().getAsLong();
+  var facade=cls("combat.api.CombatAccess").find(level).orElseThrow();
+  check(Java.loadClass("java.util.Objects").equals(facade.entities(),facade.entities())&&Java.loadClass("java.util.Objects").equals(facade.effects(),facade.effects())&&Java.loadClass("java.util.Objects").equals(facade.cooldowns(),facade.cooldowns())&&Java.loadClass("java.util.Objects").equals(facade.scheduler(),facade.scheduler())&&Java.loadClass("java.util.Objects").equals(facade.states(),facade.states()),"domain facade returns stable command services");
+  var stableSelection=world.equipmentSelection(entity.getUUID()),System=Java.loadClass("java.lang.System");
+  for(var stableTick=0;stableTick<100;stableTick++)refresh();
+  check(System.identityHashCode(stableSelection)===System.identityHashCode(world.equipmentSelection(entity.getUUID())),"unchanged equipment reuses compiled selection across 100 observations");
+  var frozen=cls("combat.platform.NativeEntityCapture").capture(entity),oldCount=frozen.equipment().get(Slot.MAINHAND).count();
+  var stackCopy=frozen.equipment().get(Slot.MAINHAND).copyStack();stackCopy.setCount(oldCount+1);
+  check(frozen.equipment().get(Slot.MAINHAND).count()===oldCount,"returned native copy cannot mutate frozen capture");
+  entity.getMainHandItem().setCount(oldCount+1);
+  var nextCapture=cls("combat.platform.NativeEntityCapture").capture(entity);
+  check(frozen.equipment().get(Slot.MAINHAND).count()===oldCount&&nextCapture.equipment().get(Slot.MAINHAND).count()===oldCount+1,"same tick requests sample new stack state without changing previous input");
+  entity.getMainHandItem().setCount(oldCount);
   var captured=world.equipmentSelection(entity.getUUID()).capture(new (cls("combat.api.input.CapturedItem"))(low).facts(),Slot.MAINHAND);
   check(captured.affixes().get().get(0).entries().get(0).contributions().size()===1&&captured.bindingPatch().equals(Patch.EMPTY),"projectile capture contains only selected damage contributions");
   world.shields().reserve(entity.getUUID(),91001,id("minecraft:player_attack"),6).commit();check(pools().get(0).balance()===4,"shield fixture consumes six units");
@@ -72,11 +84,18 @@
   var projectionController=new (cls("combat.internal.coordination.EquipmentBehaviorController"))(world,observation);projectionController.restore(entity.getUUID(),savedEquipment);
   cost=JSON.parse(String(Java.loadClass("probe.PresentationCost").measure(function(){return projectionController.save(entity.getUUID());},function(){return projectionController.projection(entity.getUUID());})));
   cost.equipment=savedEquipment.size();cost.contributionPlans=0;for(var value of savedEquipment)cost.contributionPlans+=value.contributions().size();
+  var Cost=Java.loadClass("probe.PresentationCost"),observed=new (Java.loadClass("java.util.HashMap"))();
+  for(var nativeSlot of NS.values())observed.put(cls("platform.NativeEquipment").position(nativeSlot),cls("combat.platform.WorldEquipmentObservation").capture(level,entity.getItemBySlot(nativeSlot)));
+  cost.bindingCompileOnly=JSON.parse(String(Cost.sample(function(){return cls("combat.internal.definition.EquipmentSelection").resolve(observed,world.definitions());},200,1000)));
+  cost.forcedRecomputeObservation=JSON.parse(String(Cost.equipment(world,entity.getUUID(),false)));
+  cost.cachedEquipmentObservation=JSON.parse(String(Cost.equipment(world,entity.getUUID(),true)));
+  cost.noSubscriberFlush=JSON.parse(String(Cost.sample(function(){cls("presentation.platform.CombatPresentationNetwork").flushMirrors(level);return null;},200,1000)));
+  cost.detailedPanelCapture=JSON.parse(String(Cost.sample(function(){return cls("presentation.platform.NativeEntityCombatMirror").capture(world,entity);},200,1000)));
   var current=cls("presentation.platform.NativeEntityCombatMirror").capture(world,entity),previous=current.deepCopy(),oldRows=[];
   for(var value of projectionController.save(entity.getUUID()))oldRows.push({installation:String(value.installation()),slot:String(value.slot().getName()),binding:String(value.binding().id()),definition:String(value.binding().definition()),state:value.selected()?"ACTIVE":"COMPETING"});
   previous=String(Java.loadClass("probe.PresentationCost").withEquipment(String(current),JSON.stringify(oldRows)));check(previous===String(current),"equipment projection preserves complete supplement content");
   var payloadBytes=function(json){
-   var Payload=cls("presentation.platform.network.CombatPresentationPayload"),payload=new Payload(world.sessionId(),cls("platform.NativeIds").nexus(level.dimension().identifier()),world.definitions().generation(),entity.getId(),entity.getUUID(),entity.combatnexus$incarnation(),1,false,String(json));
+   var Payload=cls("presentation.platform.network.CombatPresentationPayload"),payload=new Payload(Java.loadClass("java.util.UUID").randomUUID(),world.sessionId(),cls("platform.NativeIds").nexus(level.dimension().identifier()),world.definitions().generation(),entity.getId(),entity.getUUID(),entity.combatnexus$incarnation(),1,false,String(json));
    var buffer=new (Java.loadClass("net.minecraft.network.RegistryFriendlyByteBuf"))(Java.loadClass("io.netty.buffer.Unpooled").buffer(),level.registryAccess());
    try{Payload.STREAM_CODEC.encode(buffer,payload);return buffer.readableBytes();}finally{buffer.release();}
   }

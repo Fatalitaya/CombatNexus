@@ -12,7 +12,9 @@ public final class AttributeCatalog {
         port = Objects.requireNonNull(implementation);
     }
     public static Port get() { return Objects.requireNonNull(port, "AttributeCatalog not installed"); }
+    public enum Vanilla { ATTACK_DAMAGE, ATTACK_SPEED, MOVEMENT_SPEED, ARMOR, ARMOR_TOUGHNESS, MAX_HEALTH, MAX_ABSORPTION }
     public interface Port {
+        NexusId vanilla(Vanilla attribute);
         boolean exists(NexusId id);
         String descriptionId(NexusId id);
     }

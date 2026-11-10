@@ -20,7 +20,7 @@ public final class DomainCommandExecutor {
         return world.driverControl().resolveDamage(command.requestId(), command.request(), source, () -> execute(world, command));
     }
     public static CommandOutcome<?> execute(CombatRuntime world, DomainCommand command) {
-        var services = new WorldServices(world);
+        var services = world.services();
         try {
             return switch (command) {
                 case DomainCommand.Heal c -> {
@@ -41,6 +41,11 @@ public final class DomainCommandExecutor {
                     var journal = v.settlement().map(s -> s.evidence().journal()).orElse(new ApplicationJournal(List.of(), v.status() != DamageSubmissionStatus.FAILED));
                     yield new CommandOutcome<>(DamageResult.class, Optional.of(v), applied, journal, Optional.of(context), rejection);
                 }
+                case DomainCommand.WriteState<?> c -> writeState(services, c);
+                case DomainCommand.TakeState<?> c -> state(services.states().take(c.requestId(),c.address(),c.source()));
+                case DomainCommand.RemoveState c -> state(services.states().remove(c.requestId(),c.address(),c.source()));
+                case DomainCommand.AbilityCooldown c -> state(services.abilities().cooldown(c.request()));
+                case DomainCommand.Cleanse c -> state(services.effects().cleanse(c.request()));
                 case DomainCommand.Effect c -> state(services.effects().nativeEffect(c.request()));
                 case DomainCommand.Absorption c -> state(services.absorption().submit(c.request()));
                 case DomainCommand.CorrectHealth c -> state(services.health().correct(c.request()));
@@ -65,6 +70,9 @@ public final class DomainCommandExecutor {
         } catch (RuntimeException failure) {
             return CommandOutcome.rejected(CommandRejection.Code.INCOMPLETE_APPLICATION, "Command incomplete: " + failure.getMessage());
         }
+    }
+    private static <T> CommandOutcome<?> writeState(WorldServices services, DomainCommand.WriteState<T> command) {
+        return state(services.states().write(command.requestId(),command.address(),command.source(),command.value()));
     }
     private static CommandOutcome<CommandResult> state(CommandResult<?> value) {
         return new CommandOutcome<>(CommandResult.class, Optional.of(value), value.applied(), value.journal(), value.context(), value.rejection());

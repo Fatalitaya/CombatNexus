@@ -18,7 +18,7 @@ public interface NativeDamageAccess {
     record HealthWrite(boolean completed, boolean uncontended, RuntimeException failure) {}
     HealthWrite observeHealthWrite(LivingEntity target, Runnable nativeWrite);
     void confirmedDeath(LivingEntity target, DamageSource source);
-    void itemBlocked(LivingEntity target, DamageSource source, io.github.fatalitaya.combatnexus.api.id.NexusId item, float amount);
+    void itemBlocked(LivingEntity target, DamageSource source, io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt receipt);
     void partHit(net.minecraft.world.entity.Entity part, LivingEntity target, DamageSource source, boolean accepted);
     void protection(LivingEntity target, DamageSource source, java.util.List<io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal.Entry> evidence, boolean protectedTarget, boolean completed);
     /** Whether this source participates in framework settlement; opt-out sources retain native ownership. */

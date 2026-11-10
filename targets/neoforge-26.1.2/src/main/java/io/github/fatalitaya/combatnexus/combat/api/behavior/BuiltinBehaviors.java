@@ -16,6 +16,18 @@ public final class BuiltinBehaviors {
         public io.github.fatalitaya.combatnexus.combat.api.reaction.ReactionResult settle(SettlementContext context) { return io.github.fatalitaya.combatnexus.combat.internal.coordination.BuiltinBehaviorReactions.reflect(this, context); }
         public Reflection { DefinitionJson.range(ratio, 0, 1, "ratio"); Objects.requireNonNull(limit); }
     }
+    /** Reflects the blocked amount to the logical attacker, including projectile shooters. */
+    public record ItemBlockReflection(double ratio, TriggerLimit limit) implements io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockBehavior {
+        public ItemBlockReflection { DefinitionJson.range(ratio, 0, 1, "ratio"); Objects.requireNonNull(limit); }
+        public java.util.Set<io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation> permissions() {
+            return java.util.Set.of(io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation.DAMAGE);
+        }
+        public io.github.fatalitaya.combatnexus.combat.api.reaction.ReactionResult afterBlock(SettlementContext context,
+                io.github.fatalitaya.combatnexus.combat.damage.api.damage.DamageSettlementSnapshot damage,
+                io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt block) {
+            return io.github.fatalitaya.combatnexus.combat.internal.coordination.BuiltinBehaviorReactions.reflectBlock(this, context, damage, block);
+        }
+    }
     public record OverflowShield(double ratio, double capacity, int durationTicks, TriggerLimit limit) implements SettlementBehavior {
         public java.util.Set<io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation> permissions() { return java.util.Set.of(io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation.SHIELD); }
         public java.util.Set<io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation> subscriptions() { return java.util.Set.of(io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation.HEALING); }

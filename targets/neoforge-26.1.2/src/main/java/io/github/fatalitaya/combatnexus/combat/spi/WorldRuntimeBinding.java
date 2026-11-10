@@ -11,7 +11,7 @@ public interface WorldRuntimeBinding extends io.github.fatalitaya.combatnexus.co
             .flatMap(kernel -> kernel.world(combatnexus$worldSession()));
     }
     default java.util.Optional<io.github.fatalitaya.combatnexus.combat.api.CombatWorld> combatWorld() {
-        return existing().map(io.github.fatalitaya.combatnexus.combat.internal.WorldServices::new);
+        return existing().map(io.github.fatalitaya.combatnexus.combat.internal.CombatRuntime::services);
     }
     default java.util.List<io.github.fatalitaya.combatnexus.effect.api.EffectInstance> managedEffects(java.util.UUID target, java.util.function.IntConsumer budget) {
         return existing().map(world -> world.effects().snapshot(target, budget).stream().filter(effect->!world.effectControl().suspended(target,effect.snapshot().source())).toList()).orElse(java.util.List.of());

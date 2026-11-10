@@ -111,7 +111,9 @@ public final class ProjectileLaunchCodec {
             UUID_CODEC.optionalFieldOf("owner").forGetter(EffectView::owner),
             enumeration(EffectView.Completeness.class).fieldOf("completeness").forGetter(EffectView::completeness),
             set(enumeration(EffectView.Operation.class), 8).fieldOf("operations").forGetter(EffectView::operations),
-            ORIGIN.fieldOf("provenance").forGetter(EffectView::provenance)
+            ORIGIN.fieldOf("provenance").forGetter(EffectView::provenance),
+        io.github.fatalitaya.combatnexus.effect.api.EffectControl.CODEC.fieldOf("control").forGetter(EffectView::control),
+        Codec.STRING.xmap(io.github.fatalitaya.combatnexus.effect.api.EffectApplicationPolicy::valueOf,Enum::name).fieldOf("application").forGetter(EffectView::application)
     ).apply(i, EffectView::new));
     private static final Codec<EffectFacts> EFFECTS = RecordCodecBuilder.create(i -> i.group(
             OBSERVED.listOf(0, 256).fieldOf("observed").forGetter(EffectFacts::values),
@@ -134,7 +136,7 @@ public final class ProjectileLaunchCodec {
         var values = new EnumMap<EquipmentPosition, ItemFacts>(EquipmentPosition.class);
         equipment.forEach((slot,item) -> values.put(slot,item.facts()));
         return new NativeEntityCapture.Captured(new CombatEntityFacts(type, category, health, maxHealth, fire, external,
-            weapon.facts(), charge, strength, values, effects), weapon, equipment);
+            weapon.facts(), charge, strength, values, io.github.fatalitaya.combatnexus.platform.NativeEquipment.positions(), effects), weapon, equipment);
     }));
     private static final Codec<BehaviorComponent> COMPONENT = Codec.PASSTHROUGH.xmap(
             dynamic -> io.github.fatalitaya.combatnexus.combat.internal.registration.BehaviorTypes.decode(dynamic.convert(JsonOps.INSTANCE).getValue().getAsJsonObject()),

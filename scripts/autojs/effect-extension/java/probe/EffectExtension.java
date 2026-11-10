@@ -74,7 +74,10 @@ public final class EffectExtension {
     private static final java.util.Map<java.util.UUID, io.github.fatalitaya.combatnexus.combat.damage.api.context.NativeDamageInput> INPUTS = new java.util.LinkedHashMap<>();
     public static io.github.fatalitaya.combatnexus.combat.damage.api.context.NativeDamageInput nativeInput(java.util.UUID target) { return INPUTS.get(target); }
     private static void registerDamage(io.github.fatalitaya.combatnexus.combat.damage.platform.api.event.DamageModuleRegisterEvent event) {
+        event.registerSettlementListener(NexusId.parse("combatnexus_effect_probe:item_block_authority"), 0,
+            callback -> { if (callback.snapshot().itemBlocked()) ItemBlockExtension.retained = callback; });
         DefenseExtension.register(event);
+        ProcessorFailureProbe.register(event);
         PlanExample.registerDamage(event);
         try {
             io.github.fatalitaya.combatnexus.combat.damage.api.DamageModulePreMultiplierBuckets.runtimeIndex(
@@ -122,7 +125,7 @@ public final class EffectExtension {
                         new io.github.fatalitaya.combatnexus.combat.ability.api.AbilityExecutorSpec(
                             java.util.Set.of(io.github.fatalitaya.combatnexus.combat.ability.api.AbilityTarget.Kind.SELF),
                             java.util.Set.of(io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation.HEALING), 1),
-                        input -> true, execution -> java.util.Optional.empty()));
+                        input -> true, execution -> new io.github.fatalitaya.combatnexus.combat.ability.api.AbilityStepResult.Complete()));
                 additionalExecutors++;
             } catch (IllegalArgumentException expected) {
                 if (!expected.getMessage().contains("capacity")) throw expected;
@@ -133,6 +136,11 @@ public final class EffectExtension {
     }
     private static void register(CombatRegisterEvent event) {
         var api = event.registrar();
+        api.sourceDescriptions(NexusId.parse("probe:panel_capture_counter"), input -> {
+            if (input.entity().equals(PresentationCost.observedTarget)) PresentationCost.panelCaptures++;
+            return java.util.List.of();
+        });
+        ItemBlockExtension.register(api);
         AbilityExtension.register(api);
         SdkExample.register(api);
         PlanExample.register(api);

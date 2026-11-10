@@ -101,7 +101,7 @@ public final class CombatReactions implements CombatReactionService {
             Optional<io.github.fatalitaya.combatnexus.combat.api.action.CombatAction> action,
             java.util.function.Supplier<Optional<CombatParent>> authority,
             java.util.function.Supplier<Optional<DamageParentRef>> damageAuthority) {
-        var services=new io.github.fatalitaya.combatnexus.combat.internal.WorldServices(world);
+        var services=world.services();
         for(var policy:io.github.fatalitaya.combatnexus.combat.internal.registration.CombatExtensions.settlementPolicies())
             if(policy.subscriptions().contains(envelope.operation())) {
                 var context=new SettlementContext(services,Optional.empty(),envelope,limit->Optional.of("source_required"),authority,damageAuthority,(id,limit)->abilityRefused("Ability activation requires a captured source"));

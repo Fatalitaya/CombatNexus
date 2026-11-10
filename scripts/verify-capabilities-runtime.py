@@ -15,7 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "targets/neoforge-26.1.2"
 SCRIPTS = ROOT / "scripts/autojs"
 SUITES = {
-    "abilities": ["ability-definitions", "abilities", "external-drivers"],
+    "quality": ["processor-failures", "defense-inputs", "equipment", "item-bindings", "native-commands", "combat-scheduling", "rule-item-boundary", "callback-failures"],
+    "generic-combat": ["generic-combat"],
+    "knockback": ["knockback"],
+    "item-blocking": ["item-blocking"],
+    "json-input": ["json-input"],
+    "abilities": ["ability-definitions", "abilities", "generic-combat", "external-drivers"],
     "business-time": ["business-time", "external-time", "external-time-budget", "external-time-resume", "effect-lifetimes", "effect-phases", "combat-scheduling", "behavior-sources", "protection-cooldowns", "target-thinning", "shield-state", "recovery-and-lifecycle", "runtime-query-boundary"],
     "projectile-persistence": ["projectile-persistence"],
     "defense-inputs": ["defense-inputs"],
@@ -50,6 +55,14 @@ SUITES = {
                      "ownership-boundaries", "runtime-query-boundary"],
     "native": ["native-damage-semantics", "native-healing"],
 }
+
+def read_script(path):
+    if TARGET.name == "neoforge-1.21.1":
+        native = SCRIPTS / "neoforge-1.21.1" / path.name
+        if native.is_file():
+            return native.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8")
+
 
 def evaluate(port, code, timeout=30000, side="server"):
     payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "eval_js",
@@ -100,6 +113,8 @@ def verify_natural_ticks(port, evaluate=evaluate):
             Java.loadClass("net.neoforged.neoforge.event.tick.LevelTickEvent$Post"),listener);
         return JSON.stringify({installed:true});
     })()'''.replace("KEY", json.dumps(key))
+    if TARGET.name == "neoforge-1.21.1":
+        code = code.replace(',Java.loadClass("net.minecraft.world.entity.EntitySpawnReason").COMMAND', "")
     evaluate(port, code)
     try:
         deadline = time.monotonic() + 20
@@ -113,6 +128,7 @@ def verify_natural_ticks(port, evaluate=evaluate):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", choices=["neoforge-26.1.2", "neoforge-1.21.1"], default="neoforge-26.1.2")
     parser.add_argument("--port", type=int, default=25590)
     parser.add_argument("--game-port", type=int, default=25566)
     parser.add_argument("--suite", choices=["all", *SUITES], default="all")
@@ -124,6 +140,8 @@ def main():
     parser.add_argument("--packaged", action="store_true", help="Load core and nested compat from the final Jar")
     parser.add_argument("--syntax-only", action="store_true")
     args = parser.parse_args()
+    global TARGET
+    TARGET = ROOT / "targets" / args.target
     if args.compatibility and args.attributes_only: parser.error("Choose only one optional-mod profile")
     if (args.restart or args.reload) and not args.start: parser.error("--restart/--reload requires --start")
     if args.syntax_only:
@@ -131,7 +149,7 @@ def main():
             subprocess.run(["node", "--check", str(script)], check=True)
         for script in (ROOT / "scripts").glob("*.py"):
             import ast
-            ast.parse(script.read_text(encoding="utf-8"), filename=str(script))
+            ast.parse(read_script(script), filename=str(script))
         print("PASS: AutoJS and Python syntax")
         return 0
     profile = "compatibility" if args.compatibility else "isolated"
@@ -179,7 +197,7 @@ def main():
                 f"-PverificationRunDirectory=build/acceptance-{profile}-{run_id}", "--console", "plain"]
             names = {name for group, entries in SUITES.items() if args.suite in ("all", group) for name in entries}
             probe_classes = {path.stem for path in (SCRIPTS / "effect-extension/java/probe").glob("*.java")}
-            if any(any("probe." + cls in (SCRIPTS / ("verify-" + name + ".js")).read_text(encoding="utf-8")
+            if any(any("probe." + cls in read_script(SCRIPTS / ("verify-" + name + ".js"))
                        for cls in probe_classes) for name in names) or args.restart:
                 command.extend(["-I", str(SCRIPTS / "effect-extension.init.gradle")])
             process = subprocess.Popen(command, cwd=TARGET, stdout=log, stderr=subprocess.STDOUT,
@@ -194,16 +212,16 @@ def main():
                     if time.monotonic() >= deadline: raise RuntimeError("Server startup timeout")
                     time.sleep(.5)
         deadline = time.monotonic() + 30
-        while not session_evaluate(args.port, (SCRIPTS / "prepare-architecture.js").read_text(encoding="utf-8"))["prepared"]:
+        while not session_evaluate(args.port, read_script(SCRIPTS / "prepare-architecture.js"))["prepared"]:
             if time.monotonic() > deadline: raise RuntimeError("Native entity lookup not ready")
             time.sleep(.2)
         names = list(dict.fromkeys(name for group, names in SUITES.items() if args.suite in ("all", group) for name in names))
         for name in names:
             script = SCRIPTS / ("verify-" + name + ".js")
             try:
-                code = script.read_text(encoding="utf-8")
+                code = read_script(script)
                 if "// MATRIX" in code:
-                    matrix = json.loads((ROOT / "scripts/expectations/native-damage-26.1.2.json").read_text(encoding="utf-8"))["damage_types"]
+                    matrix = json.loads((ROOT / ("scripts/expectations/native-damage-" + TARGET.name.removeprefix("neoforge-") + ".json")).read_text(encoding="utf-8"))["damage_types"]
                     code = code.replace("// MATRIX", "matrix = " + json.dumps(matrix) + ";")
                 result = session_evaluate(args.port, "var COMBATNEXUS_COMPATIBILITY=" + str(args.compatibility).lower()
                     + ";var COMBATNEXUS_PACKAGED=" + str(args.packaged).lower() + ";\n" + code)
@@ -225,7 +243,7 @@ def main():
             frozen_before = session_evaluate(args.port, 'JSON.stringify({frozen:AutoJS.server().tickRateManager().isFrozen()})')["frozen"]
             try:
                 session_evaluate(args.port, 'AutoJS.server().tickRateManager().setFrozen(true);JSON.stringify({frozen:true})')
-                periodic_before = session_evaluate(args.port, (SCRIPTS / "prepare-ability-periodic.js").read_text(encoding="utf-8"))
+                periodic_before = session_evaluate(args.port, read_script(SCRIPTS / "prepare-ability-periodic.js"))
                 periodic_checks = []
                 elapsed = 0
                 for ticks, phase in ((12, "trigger"), (1, "early"), (9, "due")):
@@ -235,25 +253,25 @@ def main():
                     while session_evaluate(args.port, 'JSON.stringify({tick:AutoJS.server().overworld().getGameTime()})')["tick"] < periodic_before["tick"] + elapsed:
                         if time.monotonic() >= deadline: raise RuntimeError("Periodic ownership tick stepping timeout")
                         time.sleep(.05)
-                    value = session_evaluate(args.port, "var PERIODIC_BEFORE=" + json.dumps(periodic_before) + ";var PERIODIC_PHASE=" + json.dumps(phase) + ";\n" + (SCRIPTS / "verify-ability-periodic.js").read_text(encoding="utf-8"))
+                    value = session_evaluate(args.port, "var PERIODIC_BEFORE=" + json.dumps(periodic_before) + ";var PERIODIC_PHASE=" + json.dumps(phase) + ";\n" + read_script(SCRIPTS / "verify-ability-periodic.js"))
                     periodic_checks.extend(value["checks"])
                 record = {"script": "ability-periodic-release", "ok": True, "passed": len(periodic_checks), "checks": periodic_checks}
             except Exception as error:
                 record = {"script": "ability-periodic-release", "ok": False, "error": str(error)}
             finally:
                 if periodic_before is not None:
-                    session_evaluate(args.port, "var PERIODIC_BEFORE=" + json.dumps(periodic_before) + ";var PERIODIC_PHASE='cleanup';\n" + (SCRIPTS / "verify-ability-periodic.js").read_text(encoding="utf-8"))
+                    session_evaluate(args.port, "var PERIODIC_BEFORE=" + json.dumps(periodic_before) + ";var PERIODIC_PHASE='cleanup';\n" + read_script(SCRIPTS / "verify-ability-periodic.js"))
                 session_evaluate(args.port, 'AutoJS.server().tickRateManager().setFrozen(' + str(frozen_before).lower() + ');JSON.stringify({restored:true})')
             results.append(record)
             (output / "ability-periodic-release.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
             print(json.dumps(record), flush=True)
             try:
-                prepared = session_evaluate(args.port, (SCRIPTS / "prepare-ability-continuation.js").read_text(encoding="utf-8"))
+                prepared = session_evaluate(args.port, read_script(SCRIPTS / "prepare-ability-continuation.js"))
                 deadline = time.monotonic() + 20
                 while session_evaluate(args.port, 'JSON.stringify({tick:AutoJS.server().overworld().getGameTime()})')["tick"] < prepared["gameTick"] + prepared["waitTicks"]:
                     if time.monotonic() >= deadline: raise RuntimeError("Ability continuation natural tick timeout")
                     time.sleep(.05)
-                record = dict(session_evaluate(args.port, (SCRIPTS / "verify-ability-continuation.js").read_text(encoding="utf-8")), script="ability-continuation", ok=True)
+                record = dict(session_evaluate(args.port, read_script(SCRIPTS / "verify-ability-continuation.js")), script="ability-continuation", ok=True)
             except Exception as error:
                 record = {"script": "ability-continuation", "ok": False, "error": str(error)}
             results.append(record)
@@ -263,7 +281,7 @@ def main():
         if args.suite in ("vanilla-integration", "all"): observers += ("native-block-sources",)
         if observers:
             for observer in observers:
-                installed = session_evaluate(args.port, (SCRIPTS / ("verify-" + observer + ".js")).read_text(encoding="utf-8"))
+                installed = session_evaluate(args.port, read_script(SCRIPTS / ("verify-" + observer + ".js")))
                 deadline = time.monotonic() + 30
                 while True:
                     record = session_evaluate(args.port, 'Java.loadClass("java.lang.System").getProperty(' + json.dumps(installed["key"]) + ')')
@@ -276,14 +294,14 @@ def main():
                 print(json.dumps(record), flush=True)
         if args.reload:
             reload_result = subprocess.run([sys.executable, str(ROOT / "scripts/verify-behavior-runtime.py"),
-                "--port", str(args.port), "--definitions", "--definitions-only", "--run-directory", str(run_dir)],
+                "--port", str(args.port), "--definitions", "--definitions-only", "--target", args.target, "--run-directory", str(run_dir)],
                 capture_output=True, text=True, encoding="utf-8")
             (output / "reload.log").write_text(reload_result.stdout + reload_result.stderr, encoding="utf-8")
             record = {"script":"scripts/verify-behavior-runtime.py --definitions-only", "ok":reload_result.returncode == 0,
                 "passed":sum(json.loads(line).get("passed", 0) for line in reload_result.stdout.splitlines()) if reload_result.returncode == 0 else 0}
             results.append(record); print(json.dumps(record), flush=True)
         if args.reload and args.suite in ("item-bindings", "effect-foundation"):
-            binding_reload = subprocess.run([sys.executable, str(ROOT / "scripts/verify-item-binding-reload.py"), "--port", str(args.port), "--run-directory", str(run_dir)], capture_output=True, text=True, encoding="utf-8")
+            binding_reload = subprocess.run([sys.executable, str(ROOT / "scripts/verify-item-binding-reload.py"), "--target", args.target, "--port", str(args.port), "--run-directory", str(run_dir)], capture_output=True, text=True, encoding="utf-8")
             (output / "binding-reload.log").write_text(binding_reload.stdout + binding_reload.stderr, encoding="utf-8")
             record = {"script": "scripts/verify-item-binding-reload.py", "ok": binding_reload.returncode == 0, "passed": json.loads(binding_reload.stdout.splitlines()[-1])["passed"] if binding_reload.returncode == 0 else 0}
             results.append(record); print(json.dumps(record), flush=True)
@@ -292,14 +310,14 @@ def main():
             if restart_name in ("time-restart", "ability-restart", "effect-restart", "equipment-restart"):
                 session_evaluate(args.port, 'AutoJS.server().tickRateManager().setFrozen(true);JSON.stringify({frozen:true})')
                 command.append("-PverificationFrozen=true")
-            prepared = session_evaluate(args.port, (SCRIPTS / ("prepare-" + restart_name + ".js")).read_text(encoding="utf-8"))
+            prepared = session_evaluate(args.port, read_script(SCRIPTS / ("prepare-" + restart_name + ".js")))
             if restart_name == "equipment-restart":
                 session_evaluate(args.port, 'AutoJS.server().getCommands().performPrefixedCommand(AutoJS.server().createCommandSourceStack(),"tick step 25");JSON.stringify({stepping:true})')
                 deadline = time.monotonic() + 10
                 while session_evaluate(args.port, 'JSON.stringify({tick:AutoJS.server().overworld().getGameTime()})')["tick"] < prepared["gameTick"] + 25:
                     if time.monotonic() > deadline: raise RuntimeError("Equipment tick stepping timed out")
                     time.sleep(.05)
-                prepared = session_evaluate(args.port, "var RESTART_BEFORE=" + json.dumps(prepared) + ";\n" + (SCRIPTS / "verify-equipment-paused.js").read_text(encoding="utf-8"))
+                prepared = session_evaluate(args.port, "var RESTART_BEFORE=" + json.dumps(prepared) + ";\n" + read_script(SCRIPTS / "verify-equipment-paused.js"))
                 results.append(dict(prepared, script="scripts/autojs/verify-equipment-paused.js", ok=True))
             (output / "persistence-before.json").write_text(json.dumps(prepared, indent=2), encoding="utf-8")
             session_evaluate(args.port, 'AutoJS.server().halt(false); JSON.stringify({stopping:true})', 1000)
@@ -316,14 +334,14 @@ def main():
             while True:
                 if process.poll() is not None: raise RuntimeError("Restart exited; inspect restart.log")
                 try:
-                    session_evaluate(args.port, 'AutoJS.server().overworld().getChunk(0,0); JSON.stringify({ready:true})')
+                    session_evaluate(args.port, 'AutoJS.server().overworld().setChunkForced(0,0,true); AutoJS.server().overworld().getChunk(0,0); JSON.stringify({ready:true})')
                     break
                 except (OSError, RuntimeError):
                     if time.monotonic() >= deadline: raise RuntimeError("Restart startup timeout")
                     time.sleep(.5)
             deadline = time.monotonic() + 30
             while True:
-                record = session_evaluate(args.port, "var RESTART_BEFORE=" + json.dumps(prepared) + ";\n" + (SCRIPTS / ("verify-" + restart_name + ".js")).read_text(encoding="utf-8"))
+                record = session_evaluate(args.port, "var RESTART_BEFORE=" + json.dumps(prepared) + ";\n" + read_script(SCRIPTS / ("verify-" + restart_name + ".js")))
                 if record.get("ready"): break
                 if time.monotonic() >= deadline: raise RuntimeError("Saved entity did not reload")
                 time.sleep(.2)
@@ -337,7 +355,7 @@ def main():
                 while session_evaluate(args.port, 'JSON.stringify({tick:AutoJS.server().overworld().getGameTime()})')["tick"] < prepared["gameTick"] + 25:
                     if time.monotonic() >= deadline: raise RuntimeError("Restored ability tick stepping timeout")
                     time.sleep(.05)
-                record = dict(session_evaluate(args.port, "var RESTART_BEFORE=" + json.dumps(prepared) + ";\n" + (SCRIPTS / "verify-ability-restart-completed.js").read_text(encoding="utf-8")), script="ability-restart-completed", ok=True)
+                record = dict(session_evaluate(args.port, "var RESTART_BEFORE=" + json.dumps(prepared) + ";\n" + read_script(SCRIPTS / "verify-ability-restart-completed.js")), script="ability-restart-completed", ok=True)
                 results.append(record)
                 (output / "ability-restart-completed.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
                 print(json.dumps(record), flush=True)

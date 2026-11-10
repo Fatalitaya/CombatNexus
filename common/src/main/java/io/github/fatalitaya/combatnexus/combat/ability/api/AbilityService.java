@@ -12,6 +12,11 @@ public interface AbilityService {
     AbilityAvailability evaluate(AbilityRequest request);
     AbilityResult execute(AbilityRequest request);
     AbilityResult execute(AbilityRequest request, CombatParent parent);
+    AbilityResult reinput(AbilityReinput request);
+    AbilityResult reinput(AbilityReinput request, CombatParent parent);
     CommandResult<Boolean> cancel(UUID request, UUID actor, UUID execution);
+    AbilityCooldownSnapshot cooldown(UUID actor, AbilityCooldownSlot slot);
+    CommandResult<AbilityCooldownSnapshot.Change> cooldown(AbilityCooldownCommand command);
+    CommandResult<AbilityCooldownSnapshot.Change> cooldown(AbilityCooldownCommand command, CombatParent parent);
     Optional<AbilitySnapshot> execution(UUID execution);
 }
