@@ -173,7 +173,7 @@ def verify_lifecycle_ownership(root):
         projection = code.rsplit('snapshot(UUID target, java.util.function.IntConsumer budget)', 1)[1].split('return List.copyOf(result);')[0]
         assert 'budget.accept(1); result.add(' in projection
     shield = source_file(root, 'combat/shield/internal/DefaultShieldService.java').read_text(encoding='utf-8')
-    reservation = shield.split('private Reservation reserve(')[1].split('private final class Token')[0]
+    reservation = shield.rsplit('private Reservation reserve(', 1)[1].split('private final class Token')[0]
     assert reservation.index('server.admit(lineage)') < reservation.index('state.reserve(')
     commit = shield.split('@Override public ShieldCommitReceipt commit()')[1].split('@Override public void close()')[0]
     assert commit.index('Phase.APPLICATION') < commit.index('allocation.commit()') < commit.index('publish(')

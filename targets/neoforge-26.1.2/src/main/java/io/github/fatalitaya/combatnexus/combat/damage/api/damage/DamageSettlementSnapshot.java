@@ -366,12 +366,21 @@ public final class DamageSettlementSnapshot {
         return pipelineExecuted;
     }
 
-    /** Successful contact includes shield/absorption consumption, but not a resource-free zero hit. */
-    public boolean successfulHit() {
-        return status == DamageSettlementStatus.APPLIED && !cancelled && evidence.applicationCompleted()
-                && (evidence.healthLoss() > 0 || evidence.shieldLoss() > 0 || absorptionDamage > 0
-                    || evidence.equipment().stream().anyMatch(receipt -> receipt.durabilityConsumed() > 0));
+    /** Native admission/contact, independently of the amount of resources consumed. */
+    public DamageContactResult contactResult() {
+        if (cancelled || reason.filter(r -> r == DamageFailureReason.CANCELLED || r == DamageFailureReason.LATE_INCOMING_CANCELLATION).isPresent())
+            return DamageContactResult.CANCELLED;
+        if (reason.filter(r -> r == DamageFailureReason.TARGET_INVULNERABLE).isPresent()) return DamageContactResult.IMMUNE;
+        if (evidence.itemBlock().filter(b -> b.completed() && b.blocked() > 0 && b.remaining() <= 0).isPresent())
+            return DamageContactResult.BLOCKED;
+        if (evidence.intercepted()) return DamageContactResult.INTERCEPTED;
+        if (!evidence.applicationCompleted()) return reason.filter(r -> r == DamageFailureReason.INTERNAL_ERROR).isPresent()
+                ? DamageContactResult.UNKNOWN : DamageContactResult.REJECTED;
+        return evidence.contactAccepted() ? DamageContactResult.ACCEPTED : DamageContactResult.REJECTED;
     }
+    public boolean successfulHit() { return contactResult() == DamageContactResult.ACCEPTED; }
+    /** Confirmed damage to health, shields or absorption; equipment wear is separate. */
+    public boolean causedDamage() { return evidence.healthLoss() > 0 || evidence.shieldLoss() > 0 || absorptionDamage > 0; }
 
     public DamageSettlementStatus status() {
         return status;

@@ -308,7 +308,7 @@ public final class CombatRuntime {
         if (!CombatDispatchScope.delivering(callback, serverSession()) || callback.context().level() != level)
             throw new IllegalStateException("Recovery delay requires this world's active damage settlement");
         var snapshot = callback.snapshot();
-        if (snapshot.successfulHit())
+        if (snapshot.causedDamage())
             if (callback.context().target() != null) regeneration.recordDamage(snapshot.target().entity(), businessTick(snapshot.target().entity(), io.github.fatalitaya.combatnexus.api.id.NexusId.fromNamespaceAndPath("combatnexus", "regeneration")));
     }
     public void dispatchHealingReaction(io.github.fatalitaya.combatnexus.combat.api.transaction.CombatCallback<io.github.fatalitaya.combatnexus.combat.healing.api.HealingSettlement> callback,

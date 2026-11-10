@@ -6,7 +6,8 @@ import java.util.OptionalLong;
 public enum PeriodicPhase {
     /** Refresh starts a new interval using the configured initial delay. */
     RESTART,
-    /** Refresh preserves the next pending trigger for the same behavior type. */
+    /** Refresh preserves the next pending trigger for the same behavior type, including
+     * aggregate-effect replacement by a different source. Remaining delay uses the new source clock. */
     PRESERVE,
     /** Trigger when remaining duration is divisible by the interval, as vanilla effects do. */
     REMAINING_DURATION;

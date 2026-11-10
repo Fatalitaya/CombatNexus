@@ -126,9 +126,6 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+ext.publicationEnabled = true
+ext.publishMinecraftVersion = neoforge_121_minecraft_version
 apply from: file('../../gradle/target-conventions/publish.gradle')
-
-// Publication stays disabled until the 1.21.1 target is explicitly released.
-tasks.matching { it.name.startsWith('publish') }.configureEach {
-    doFirst { throw new GradleException('Publication of the 1.21.1 development target is disabled.') }
-}

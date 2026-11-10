@@ -18,6 +18,37 @@ final class ProtectionExecutor {
     void remove(long installation) { uses.remove(installation); }
     void clear() { uses.clear(); }
 
+    WorldBehaviorSources.GuardDecision guard(CombatRuntime world, WorldBehaviorSources sources,
+            io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardContext input, List<BehaviorSource> captured) {
+        if (!CombatExecutionScope.isCurrentPhase(CombatExecutionScope.Phase.APPLICATION))
+            throw new IllegalStateException("Damage guard requires application");
+        var lineage = CombatExecutionScope.currentLineage(world.serverSession()).orElseThrow();
+        if (lineage.operation() != io.github.fatalitaya.combatnexus.combat.api.transaction.CombatOperation.DAMAGE)
+            throw new IllegalStateException("Damage guard requires damage");
+        world.serverRuntime().ticket(lineage).bindTarget(world, input.target());
+        if (captured.size() > 64 || captured.stream().anyMatch(s -> !s.target().equals(input.target()) || !s.session().equals(world.sessionId())))
+            throw new IllegalArgumentException("Foreign damage guard input");
+        for (var source : captured) {
+            if (!sources.valid(source)) continue;
+            for (var component : source.plan().components()) {
+                if (!(component instanceof io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior guard)
+                        || guard.stage() != input.stage()
+                        || !uses.available(source.installation(), component.type(), guard.maximumUses(), world.businessTick(source.target(), source.source()))) continue;
+                Optional<io.github.fatalitaya.combatnexus.combat.api.BeforeApplicationPlan> plan;
+                try (var compute = CombatExecutionScope.computation()) {
+                    plan = Objects.requireNonNull(guard.select(new io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardContext(
+                            input.target(), input.stage(), input.requestKind(), input.sourceTags(), input.action(),
+                            input.health(), input.maximumHealth(), input.damage(), input.remainingHealthDamage(), input.inputs(), source)));
+                }
+                if (plan.isEmpty()) continue;
+                uses.consume(source.installation(), component.type(), guard.cooldownTicks(), world.businessTick(source.target(), source.source()));
+                return new WorldBehaviorSources.GuardDecision(true, plan.get(), Optional.of(ApplicationJournal.Entry.write(
+                        ApplicationJournal.Resource.PROTECTION, source.source(), 1, 0, 1, true)));
+            }
+        }
+        return WorldBehaviorSources.GuardDecision.NONE;
+    }
+
     ProtectionDecision decide(CombatRuntime world, WorldBehaviorSources sources, UUID target,
             List<BehaviorSource> captured, float before, float proposed, io.github.fatalitaya.combatnexus.combat.api.behavior.ReactionInputs inputs, java.util.Optional<io.github.fatalitaya.combatnexus.combat.api.CombatSource> origin) {
         var server = world.serverRuntime();

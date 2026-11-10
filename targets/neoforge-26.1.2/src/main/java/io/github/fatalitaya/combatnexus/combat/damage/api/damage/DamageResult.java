@@ -74,6 +74,15 @@ public final class DamageResult {
 
     }
 
+    /** Also reports admission refusals, which do not create a managed settlement. */
+    public DamageContactResult contactResult() {
+        if (settlement.isPresent()) return settlement.orElseThrow().contactResult();
+        if (failure.filter(f -> f.reason() == DamageFailureReason.TARGET_INVULNERABLE).isPresent())
+            return DamageContactResult.IMMUNE;
+        return failure.filter(f -> f.reason() == DamageFailureReason.INTERNAL_ERROR).isPresent()
+                ? DamageContactResult.UNKNOWN : DamageContactResult.REJECTED;
+    }
+
     public static DamageResult rejected(
             DamageRequest request,
             DamageFailureReason reason,

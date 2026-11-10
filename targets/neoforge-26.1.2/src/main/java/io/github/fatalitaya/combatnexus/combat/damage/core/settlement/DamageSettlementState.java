@@ -21,6 +21,7 @@ import java.util.Map;
 @ApiStatus.Internal
 public final class DamageSettlementState {
     private boolean applicationCompleted;
+    private boolean contactAccepted;
     private boolean beforePlanEntered;
     private io.github.fatalitaya.combatnexus.combat.api.BeforeApplicationPlan.Result beforeResult = io.github.fatalitaya.combatnexus.combat.api.BeforeApplicationPlan.Result.EMPTY;
     void appendBeforeResult(io.github.fatalitaya.combatnexus.combat.api.BeforeApplicationPlan.Result result) {
@@ -62,6 +63,38 @@ public final class DamageSettlementState {
     }
     private boolean equipmentConsumed() { return equipment.stream().anyMatch(receipt -> receipt.durabilityConsumed() > 0); }
     private final java.util.List<io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal.Entry> writes = new java.util.ArrayList<>();
+    private boolean intercepted;
+    private final java.util.EnumSet<io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage> guardStages =
+            java.util.EnumSet.noneOf(io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage.class);
+    boolean guard(io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage stage, float damage, float remaining) {
+        if (calculation == null || calculation.cancelled() || lateIncomingCancellation || damage <= 0
+                || !guardStages.add(stage)) return intercepted;
+        if (io.github.fatalitaya.combatnexus.combat.driver.internal.ResolvedNumbers.driver(origin.lineage().damageId())
+                .filter(driver -> driver.managedProtection() == io.github.fatalitaya.combatnexus.combat.driver.api.DriverDefinition.ApplicationOwner.EXTERNAL).isPresent()) return false;
+        var server = CombatServerRuntime.of((io.github.fatalitaya.combatnexus.combat.spi.ServerRuntimeBinding) level.getServer());
+        var world = server.world(((io.github.fatalitaya.combatnexus.combat.spi.WorldRuntimeBinding) level).combatnexus$worldSession()).orElseThrow();
+        try (var applying = server.ticket(origin.lineage().transaction()).enter(
+                io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatExecutionScope.Phase.APPLICATION)) {
+            var context = new io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardContext(target.getUUID(), stage,
+                    origin.requestKind(), origin.sourceTags(), calculation.action(), target.getHealth(), target.getMaxHealth(),
+                    damage, remaining, calculation.reactionInputs(), null);
+            var decision = world.behaviorControl().guard(context, calculation.behaviors());
+            if (!decision.selected()) return false;
+            decision.consumption().ifPresent(writes::add);
+            intercepted |= stage == io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage.BEFORE_RESOURCES;
+            try {
+                var result = io.github.fatalitaya.combatnexus.combat.internal.transaction.BeforeApplicationExecutor.execute(world, decision.plan());
+                appendBeforeResult(result);
+                if (!result.continueParent() || !result.completed()) throw new IllegalStateException("Damage guard application stopped");
+                server.ticket(origin.lineage().transaction()).bindTarget(world, target.getUUID());
+                if (!target.isAlive() || target.isRemoved() || target.level() != level) throw new IllegalStateException("Damage guard target unavailable");
+            } catch (RuntimeException | Error failure) {
+                appendBeforeResult(new io.github.fatalitaya.combatnexus.combat.api.BeforeApplicationPlan.Result(java.util.List.of(), false, false));
+                throw failure;
+            }
+            return intercepted;
+        }
+    }
     private boolean protectionDecided;
     private Float protectedHealth;
     float protectHealth(float before, float proposed) {
@@ -219,6 +252,7 @@ public final class DamageSettlementState {
         healthBefore = safeAmount(health);
         absorptionBefore = safeAmount(absorption);
         phase = DamageSettlementPhase.PRE_APPLY_CAPTURED;
+        contactAccepted = true;
     }
 
     DamageSettlementCompletion capturePost(float inflictedDamage, float observedHealth, float observedAbsorption) {
@@ -291,6 +325,10 @@ public final class DamageSettlementState {
             return null;
         }
 
+        if (contactAccepted && !incomingCancelled && !lateIncomingCancellation && !calculation.cancelled()
+                && beforeResult.completed() && (calculation.resolvedDamage() == 0 || intercepted)) {
+            return capturePost(0, target.getHealth(), target.getAbsorptionAmount());
+        }
         if (vanillaAccepted) {
             return abort();
         }
@@ -412,7 +450,7 @@ public final class DamageSettlementState {
     io.github.fatalitaya.combatnexus.combat.damage.api.damage.DamageApplicationEvidence evidence() {
         if (calculation == null) return io.github.fatalitaya.combatnexus.combat.damage.api.damage.DamageApplicationEvidence.NONE;
         return new io.github.fatalitaya.combatnexus.combat.damage.api.damage.DamageApplicationEvidence(
-                        healthWriteObserved, confirmedHealthLoss, shieldLoss, calculation.reactionInputs(), applicationCompleted,
+                        contactAccepted, intercepted, healthWriteObserved, confirmedHealthLoss, shieldLoss, calculation.reactionInputs(), applicationCompleted,
                         new io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal(writes, applicationCompleted), calculation.behaviors(), calculation.action(), beforeResult, equipment, java.util.Optional.ofNullable(itemBlock));
     }
 

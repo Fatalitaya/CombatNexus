@@ -11,6 +11,12 @@ public interface ShieldPoolServiceControl extends ShieldPoolService {
 
     void suspend(UUID target,io.github.fatalitaya.combatnexus.api.id.NexusId source,boolean suspended);
     void refresh(UUID target,io.github.fatalitaya.combatnexus.api.id.NexusId source,ShieldDefinition definition);
+    /** Preview without retaining a reservation or consuming its application identity. */
+    double previewRemaining(UUID target, long damageId, io.github.fatalitaya.combatnexus.api.id.NexusId type,
+            double amount, Map<io.github.fatalitaya.combatnexus.api.id.NexusId, Float> channels);
+    Reservation reserveAfterReaction(UUID target, long damageId, io.github.fatalitaya.combatnexus.api.id.NexusId type,
+            double amount, Map<io.github.fatalitaya.combatnexus.api.id.NexusId, Float> channels,
+            double maximumAbsorption, Set<io.github.fatalitaya.combatnexus.api.id.NexusId> existingSources);
     void close();
     void tick(long gameTick);
     void clear(UUID target);

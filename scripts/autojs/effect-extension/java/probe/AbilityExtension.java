@@ -68,6 +68,12 @@ public final class AbilityExtension {
     public static void register(CombatRegistrar api) {
         registrar=api;GenericCombatExtension.register(api);
         api.abilityExecutor(id("heal_executor"),healer());
+        api.abilityExecutor(id("segments_executor"),new AbilityExecutor(healer().spec(),input->true,execution->{
+            var original=execution.action();
+            for(int segment=0;segment<2;segment++)execution.attackAction(()->{observe(execution);heal(execution,1);});
+            if(!execution.action().equals(original))throw new IllegalStateException("Action not restored");
+            return new AbilityStepResult.Complete();
+        }));
         api.abilityExecutor(id("combo_executor"),new AbilityExecutor(new AbilityExecutorSpec(Set.of(AbilityTarget.Kind.ENTITY,AbilityTarget.Kind.ENTITIES),Set.of(CombatOperation.DAMAGE,CombatOperation.EFFECT),1),
             input->true,execution->{
                 observe(execution);
@@ -95,6 +101,7 @@ public final class AbilityExtension {
         }));
         var targets=Set.of(AbilityTarget.Kind.SELF,AbilityTarget.Kind.ENTITY,AbilityTarget.Kind.ENTITIES);
         var definitions=api.definitions();
+        definitions.ability(id("ability_segments"),definition("ability_segments","segments_executor",targets,0,Optional.empty(),AbilityTrigger.ACTIVE));
         definitions.ability(id("ability_heal"),definition("ability_heal","heal_executor",targets,20,Optional.empty(),AbilityTrigger.ACTIVE));
         definitions.ability(id("ability_shared"),definition("ability_shared","heal_executor",targets,20,Optional.of(id("shared_healing")),AbilityTrigger.ACTIVE));
         definitions.ability(id("ability_combo"),definition("ability_combo","combo_executor",Set.of(AbilityTarget.Kind.ENTITY,AbilityTarget.Kind.ENTITIES),0,Optional.empty(),AbilityTrigger.ACTIVE));

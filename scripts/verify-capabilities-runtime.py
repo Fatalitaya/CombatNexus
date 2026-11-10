@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "targets/neoforge-26.1.2"
 SCRIPTS = ROOT / "scripts/autojs"
 SUITES = {
+    "api-gaps": ["api-gaps", "effect-phases", "preapplication-decisions", "abilities", "item-blocking"],
     "quality": ["processor-failures", "defense-inputs", "equipment", "item-bindings", "native-commands", "combat-scheduling", "rule-item-boundary", "callback-failures"],
     "generic-combat": ["generic-combat"],
     "knockback": ["knockback"],

@@ -76,6 +76,7 @@ public final class EffectExtension {
     private static void registerDamage(io.github.fatalitaya.combatnexus.combat.damage.platform.api.event.DamageModuleRegisterEvent event) {
         event.registerSettlementListener(NexusId.parse("combatnexus_effect_probe:item_block_authority"), 0,
             callback -> { if (callback.snapshot().itemBlocked()) ItemBlockExtension.retained = callback; });
+        event.registerSettlementListener(NexusId.parse("combatnexus_effect_probe:gap_facts"),0,callback -> { ApiGapProbe.last=callback.snapshot(); if(callback.snapshot().successfulHit()&&!callback.snapshot().causedDamage())ApiGapProbe.zeroAuthority=callback.childAuthority().isPresent()&&callback.combatAuthority().isPresent(); });
         DefenseExtension.register(event);
         ProcessorFailureProbe.register(event);
         PlanExample.registerDamage(event);
@@ -142,6 +143,7 @@ public final class EffectExtension {
         });
         ItemBlockExtension.register(api);
         AbilityExtension.register(api);
+        ApiGapProbe.register(api);
         SdkExample.register(api);
         PlanExample.register(api);
         SemanticExample.register(api);

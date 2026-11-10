@@ -77,6 +77,13 @@ public final class WorldBehaviorSources implements BehaviorSources {
             UUID target, List<BehaviorSource> captured, float before, float proposed, io.github.fatalitaya.combatnexus.combat.api.behavior.ReactionInputs inputs, java.util.Optional<io.github.fatalitaya.combatnexus.combat.api.CombatSource> origin) {
         check(); return protection.decide(world, this, target, captured, before, proposed, inputs, origin);
     }
+    public GuardDecision guard(io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardContext context,
+            List<BehaviorSource> captured) {
+        check(); return protection.guard(world, this, context, captured);
+    }
+    public record GuardDecision(boolean selected, BeforeApplicationPlan plan, Optional<ApplicationJournal.Entry> consumption) {
+        public static final GuardDecision NONE = new GuardDecision(false, BeforeApplicationPlan.EMPTY, Optional.empty());
+    }
     private boolean protectionAvailable(BehaviorSource source) { return valid(source) && protection.available(source, time.now(source.target(), source.source())); }
     public EffectContributionPort compose(EffectContributionPort attributes) {
         return new EffectContributionPort() {
@@ -159,8 +166,17 @@ public final class WorldBehaviorSources implements BehaviorSources {
                             var source = entry.getValue();
                             if (source != null && source.equals(before.get(entry.getKey())))
                                 periodic.restore(source, beforePeriodic.get(source.installation()), preparedAt.get(key(source)));
-                            else if (source != null && before.get(entry.getKey()) != null)
-                                periodic.refresh(source, beforePeriodic.get(before.get(entry.getKey()).installation()), preparedAt.get(key(source)), change.preservePeriodicPhase());
+                            else if (source != null) {
+                                var previous = before.get(entry.getKey());
+                                // An aggregate replacement explicitly identifies its predecessor even when
+                                // ownership changes the source key. Transfer remaining delay, not clock time.
+                                if (previous == null && change.before().size() == 1 && change.after().size() == 1
+                                        && change.before().get(0).display().aggregateSources()
+                                        && change.after().get(0).display().aggregateSources())
+                                    previous = before.get(key(change.before().get(0)));
+                                if (previous != null)
+                                    periodic.refresh(source, beforePeriodic.get(previous.installation()), preparedAt.get(key(source)), change.preservePeriodicPhase());
+                            }
                         }
                         if (applied.completed()) { blocked.removeAll(after.keySet()); after.keySet().forEach(k -> ordered.remove(k.target())); }
                         return applied;

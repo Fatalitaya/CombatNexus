@@ -154,16 +154,21 @@ final class ShieldPoolState {
         if (!enlisted && reservations.size() >= MAX_RESERVATIONS_PER_TICK) throw new IllegalStateException("Reservation budget exceeded");
     }
     AllocationState reserve(UUID target, long damageId, NexusId damageType, double amount, Map<NexusId, Double> channelRemainder) {
+        return reserve(target, damageId, damageType, amount, channelRemainder, amount, Set.of());
+    }
+    AllocationState reserve(UUID target, long damageId, NexusId damageType, double amount, Map<NexusId, Double> channelRemainder,
+            double maximumAbsorption, Set<NexusId> existingSources) {
         List<Allocation> allocations = new ArrayList<>();
         double remaining = amount;
-        for (Pool pool : ordered(target)) {
+        var pools = ordered(target).stream().sorted(Comparator.comparing(p -> !existingSources.contains(p.grant.source().id()))).toList();
+        for (Pool pool : pools) {
             if (remaining == 0) break;
             if(pool.suspended)continue;
             if (!pool.grant.definition().unrestricted() && !pool.eligibleDamageTypes.contains(damageType)) continue;
             var selected = pool.grant.definition().channels();
             double eligible = channelRemainder.entrySet().stream()
                     .filter(e -> selected.isEmpty() || selected.contains(e.getKey())).mapToDouble(Map.Entry::getValue).sum();
-            double take = Math.min(remaining, Math.min(eligible, Math.max(0, pool.balance - pool.held)));
+            double take = Math.min(Math.max(0, maximumAbsorption - (amount - remaining)), Math.min(remaining, Math.min(eligible, Math.max(0, pool.balance - pool.held))));
             if (take == 0) continue;
             pool.held += take;
             var absorbedChannels = new LinkedHashMap<NexusId, Double>();

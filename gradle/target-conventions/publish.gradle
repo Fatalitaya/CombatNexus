@@ -30,18 +30,28 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 def publishLoader = 'neoforge'
-def publishMinecraftVersion = providers.gradleProperty('neoforge_121_minecraft_version')
-        .orElse(providers.gradleProperty('neoforge_261_minecraft_version'))
+def publishMinecraftVersion = project.ext.publishMinecraftVersion.toString()
+def publicationVersion = project.version.toString()
+def snapshot = publicationVersion.endsWith('-SNAPSHOT')
+def publicationEnabled = project.ext.publicationEnabled
+def publicationTarget = project.name
+def repositoryName = snapshot ? 'maven-snapshots' : 'maven-releases'
+def publishUrl = providers.environmentVariable('COMBATNEXUS_MAVEN_URL')
+        .getOrElse("https://maven.sighs.cc/repository/${repositoryName}/").trim()
 def publishFile = tasks.named('jar', Jar).flatMap { it.archiveFile }
-def curseforgeProjectId = providers.provider { findProperty('publish_curseforge_project_id')?.toString() }
+def configuredCurseforgeProjectId = findProperty('publish_curseforge_project_id')?.toString()
+def configuredModrinthProjectId = findProperty('publish_modrinth_project_id')?.toString()
+def curseforgeProjectId = providers.provider { configuredCurseforgeProjectId }
         .orElse(providers.environmentVariable('CURSEFORGE_PROJECT_ID'))
-def modrinthProjectId = providers.provider { findProperty('publish_modrinth_project_id')?.toString() }
+def modrinthProjectId = providers.provider { configuredModrinthProjectId }
         .orElse(providers.environmentVariable('MODRINTH_PROJECT_ID'))
 
 publishMods {
     file = publishFile
+    version = publicationVersion
+    displayName = "${project.mod_name} ${publicationVersion} (NeoForge ${publishMinecraftVersion})"
     changelog = providers.environmentVariable('PUBLISH_CHANGELOG').getOrElse('See the project changelog for details.')
-    type = STABLE
+    type = snapshot ? ALPHA : STABLE
     modLoaders.add(publishLoader)
 
     curseforge {
@@ -59,18 +69,39 @@ publishMods {
     }
 }
 
-tasks.named('publishMods').configure {
-    doFirst {
-        def missing = [
-                'publish_curseforge_project_id (or CURSEFORGE_PROJECT_ID)': curseforgeProjectId,
-                'publish_modrinth_project_id (or MODRINTH_PROJECT_ID)'    : modrinthProjectId,
-                'CURSEFORGE_TOKEN'                                        : providers.environmentVariable('CURSEFORGE_TOKEN'),
-                'MODRINTH_TOKEN'                                          : providers.environmentVariable('MODRINTH_TOKEN')
-        ].findAll { _, value -> !value.present || value.get().trim().isEmpty() }.keySet()
-
-        if (!missing.isEmpty()) {
-            throw new GradleException("Cannot publish mods; missing: ${missing.join(', ')}")
+def validatePublication = tasks.register('validatePublication') {
+    doLast {
+        if (!publicationEnabled) {
+            throw new GradleException("Publication of the ${publicationTarget} development target is disabled.")
         }
+    }
+}
+
+[
+        Curseforge: [
+                'publish_curseforge_project_id (or CURSEFORGE_PROJECT_ID)': curseforgeProjectId,
+                'CURSEFORGE_TOKEN': providers.environmentVariable('CURSEFORGE_TOKEN')
+        ],
+        Modrinth: [
+                'publish_modrinth_project_id (or MODRINTH_PROJECT_ID)': modrinthProjectId,
+                'MODRINTH_TOKEN': providers.environmentVariable('MODRINTH_TOKEN')
+        ]
+].each { platform, required ->
+    // Capture values during configuration; execution must not access Project.
+    def missing = required.findAll { _, value -> !value.present || value.get().trim().isEmpty() }.keySet().toList()
+    def validatePlatform = tasks.register("validate${platform}Publication") {
+        dependsOn validatePublication
+        doLast {
+            if (!missing.isEmpty()) {
+                throw new GradleException("Cannot publish to ${platform}; missing: ${missing.join(', ')}")
+            }
+        }
+    }
+    tasks.named("publish${platform}").configure { dependsOn validatePlatform }
+    // Validate both destinations before either upload when using the aggregate.
+    tasks.named('publishMods').configure { dependsOn validatePlatform }
+    tasks.matching { it.name in ['publishCurseforge', 'publishModrinth'] }.configureEach {
+        mustRunAfter validatePlatform
     }
 }
 
@@ -97,11 +128,7 @@ publishing {
     }
 
     repositories {
-        def repositoryName = project.version.toString().endsWith('-SNAPSHOT')
-                ? 'maven-snapshots' : 'maven-releases'
-        def publishUrl = providers.environmentVariable('COMBATNEXUS_MAVEN_URL')
-                .getOrElse("https://maven.sighs.cc/repository/${repositoryName}/")
-        maven {
+        if (!publishUrl.isEmpty()) maven {
             name = 'remoteRepo'
             url = uri(publishUrl)
             credentials {
@@ -116,18 +143,68 @@ publishing {
     }
 }
 
-def mavenSnapshotVersion = project.version.toString()
+def validateMavenPublication = tasks.register('validateMavenPublication') {
+    dependsOn validatePublication
+    doLast {
+        if (publishUrl.isEmpty()) {
+            throw new GradleException('Cannot publish to Maven; set COMBATNEXUS_MAVEN_URL to the release or snapshot repository URL.')
+        }
+    }
+}
+
+tasks.named('publish').configure {
+    dependsOn validateMavenPublication
+}
+tasks.withType(PublishToMavenRepository).configureEach {
+    dependsOn validateMavenPublication
+    // Always upload again. Overwriting releases requires Allow redeploy on the server;
+    // Maven snapshots retain the standard timestamped deployment behavior.
+    outputs.upToDateWhen { false }
+}
+tasks.withType(PublishToMavenLocal).configureEach {
+    enabled = false
+}
+tasks.named('publishToMavenLocal').configure {
+    enabled = false
+    setDependsOn([])
+}
+
 tasks.register('publishMavenSnapshot') {
-    group = 'publishing'
-    description = 'Publishes the current SNAPSHOT version to the remote Maven repository.'
     dependsOn {
-        if (!mavenSnapshotVersion.endsWith('-SNAPSHOT')) {
+        if (!snapshot) {
             throw new GradleException('publishMavenSnapshot requires a version ending in -SNAPSHOT.')
         }
-        'publishMavenJavaPublicationToRemoteRepoRepository'
+        'publish'
+    }
+}
+
+tasks.register('publishMavenRelease') {
+    dependsOn {
+        if (snapshot) {
+            throw new GradleException('publishMavenRelease requires a version not ending in -SNAPSHOT.')
+        }
+        'publish'
     }
 }
 
 tasks.withType(GenerateModuleMetadata).configureEach {
     enabled = false
+}
+
+def publishingEntrypoints = [
+        publish: 'Uploads to the configured Maven repository; redeploys existing coordinates if the server permits.',
+        publishMavenSnapshot: 'Uploads a SNAPSHOT to the configured Maven repository with standard Maven timestamps.',
+        publishMavenRelease: 'Uploads a release to the configured Maven repository; redeploys existing coordinates if the server permits.',
+        publishCurseforge: 'Uploads to CurseForge using its project ID and token.',
+        publishModrinth: 'Uploads to Modrinth using its project ID and token.',
+        publishMods: 'Uploads to both CurseForge and Modrinth (does not publish Maven).'
+]
+tasks.configureEach {
+    if (publishingEntrypoints.containsKey(name)) {
+        group = 'publishing'
+        description = publishingEntrypoints[name] + (publicationEnabled ? '' : ' [Disabled for this development target.]')
+    } else if (group == 'publishing') {
+        // Keep generated tasks callable, but expose only the intended entrypoints.
+        group = null
+    }
 }

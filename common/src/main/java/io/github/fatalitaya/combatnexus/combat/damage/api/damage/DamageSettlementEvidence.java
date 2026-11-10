@@ -6,7 +6,7 @@ import io.github.fatalitaya.combatnexus.combat.api.ApplicationJournal;
 import io.github.fatalitaya.combatnexus.combat.api.action.CombatAction;
 
 /** Retainable application evidence. Executable plans and extension objects belong to delivery only. */
-public record DamageSettlementEvidence(boolean healthWriteObserved, float healthLoss, double shieldLoss,
+public record DamageSettlementEvidence(boolean contactAccepted, boolean intercepted, boolean healthWriteObserved, float healthLoss, double shieldLoss,
         boolean applicationCompleted, ApplicationJournal journal, Optional<CombatAction> action,
         List<EquipmentDamageReceipt> equipment, Map<UUID, AttributeSnapshot> attributes, BeforeApplication beforeApplication, Optional<io.github.fatalitaya.combatnexus.combat.blocking.api.ItemBlockReceipt> itemBlock) {
     public record BeforeStep(int index, io.github.fatalitaya.combatnexus.api.id.NexusId commandType,
@@ -20,7 +20,7 @@ public record DamageSettlementEvidence(boolean healthWriteObserved, float health
     public static DamageSettlementEvidence capture(DamageApplicationEvidence evidence) {
         var attributes = new LinkedHashMap<UUID, AttributeSnapshot>();
         evidence.reactionInputs().participants().forEach((id, input) -> attributes.put(id, input.attributeSnapshot()));
-        return new DamageSettlementEvidence(evidence.healthWriteObserved(), evidence.healthLoss(), evidence.shieldLoss(),
+        return new DamageSettlementEvidence(evidence.contactAccepted(), evidence.intercepted(), evidence.healthWriteObserved(), evidence.healthLoss(), evidence.shieldLoss(),
             evidence.applicationCompleted(), evidence.journal(), evidence.action(), evidence.equipment(), attributes,
             new BeforeApplication(evidence.beforeApplication().steps().stream().map(step -> new BeforeStep(
                 step.index(), step.commandType(), step.result().applied(), step.journal(), step.context(), step.rejection())).toList(),

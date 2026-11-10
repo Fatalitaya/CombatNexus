@@ -378,7 +378,16 @@ public final class DefaultAbilityService implements AbilityService {
         public void released(){check();if(!execution.released){execution.released=true;fact(execution,AbilityFact.Kind.RELEASED);}}
         public Invocation invocation(){check();return execution.invocation;}
         public AbilityInput input(){check();return input;}
-        public CombatAction action(){check();return execution.action;}
+        private CombatAction attackAction;
+        public CombatAction action(){check();return attackAction == null ? execution.action : attackAction;}
+        public void attackAction(Runnable attack){
+            check();Objects.requireNonNull(attack);
+            var previous=attackAction;
+            try(var scope=CombatActionScope.open(world,execution.action.actor())){
+                attackAction=CombatActionScope.current(world.sessionId(),execution.action.actor()).orElseThrow();
+                attack.run();
+            }finally{attackAction=previous;}
+        }
         public int step(){check();return execution.step;}
         public AbilityParameters state(){check();return execution.state;}
         public CombatSource source(){check();return new CombatSource(sourceKey(execution.request.grant()),Optional.of(execution.request.grant().actor().entity()),Optional.empty());}

@@ -79,12 +79,32 @@ public final class NativeDamageAdapter implements NativeDamageAccess {
                 || !(target.level() instanceof ServerLevel level) || !DamageSourcePolicy.shouldManage(io.github.fatalitaya.combatnexus.combat.spi.ContentAccess.get().damageTypeFacts(source))) return amount;
         var lineage = CombatExecutionScope.currentLineage(io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatServerRuntime.existing((io.github.fatalitaya.combatnexus.combat.spi.ServerRuntimeBinding) (level.getServer())).map(io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatServerRuntime::session).orElse(null));
         if (lineage.isEmpty()) return amount;
-        if (io.github.fatalitaya.combatnexus.combat.driver.internal.ResolvedNumbers.driver(lineage.get().id())
-                .filter(driver -> driver.shields() == io.github.fatalitaya.combatnexus.combat.driver.api.DriverDefinition.ApplicationOwner.EXTERNAL).isPresent()) return amount;
+        boolean externalShields = io.github.fatalitaya.combatnexus.combat.driver.internal.ResolvedNumbers.driver(lineage.get().id())
+                .filter(driver -> driver.shields() == io.github.fatalitaya.combatnexus.combat.driver.api.DriverDefinition.ApplicationOwner.EXTERNAL).isPresent();
         var runtime = io.github.fatalitaya.combatnexus.combat.internal.transaction.CombatServerRuntime.existing((io.github.fatalitaya.combatnexus.combat.spi.ServerRuntimeBinding) (level.getServer()))
             .flatMap(server -> server.world(((io.github.fatalitaya.combatnexus.combat.spi.WorldRuntimeBinding) (level)).combatnexus$worldSession())).orElseThrow();
         var type = ContentAccess.get().keyId(source.typeHolder().unwrapKey().orElseThrow());
-        try (var reserved = runtime.shields().reserve(target.getUUID(), lineage.get().id(), type, amount, DamageSettlementTracker.channelDamage(target, source))) {
+        if (DamageSettlementTracker.guard(target, source,
+                io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage.BEFORE_RESOURCES, amount, amount)) return 0;
+        var existingPools = runtime.shields().snapshot(target.getUUID()).stream().map(pool -> pool.source().id()).collect(java.util.stream.Collectors.toSet());
+        float predicted;
+        try (var applying = runtime.serverRuntime().ticket(lineage.get()).enter(CombatExecutionScope.Phase.APPLICATION)) {
+            predicted = externalShields ? amount : (float) runtime.shieldControl().previewRemaining(target.getUUID(), lineage.get().id(), type, amount,
+                    DamageSettlementTracker.channelDamage(target, source));
+        }
+        float before = target.getHealth();
+        float proposed = before - Math.max(0, predicted - target.getAbsorptionAmount());
+        float protectedHealth = DamageSettlementTracker.protectHealth(target, source, before, proposed);
+        if (protectedHealth < before)
+            DamageSettlementTracker.guard(target, source,
+                    io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage.REMAINING_HEALTH, amount, before - protectedHealth);
+        if (externalShields) return amount;
+        // Existing pools retain precedence; new shields only take the predicted health remainder,
+        // leaving the already allocated absorption and earlier protection intact.
+        double shieldBudget = Math.max(0, amount - predicted) + Math.max(0, before - protectedHealth);
+        try (var applying = runtime.serverRuntime().ticket(lineage.get()).enter(CombatExecutionScope.Phase.APPLICATION);
+             var reserved = runtime.shieldControl().reserveAfterReaction(target.getUUID(), lineage.get().id(), type, amount,
+                     DamageSettlementTracker.channelDamage(target, source), shieldBudget, existingPools)) {
             float remaining = (float)reserved.remainingDamage();
             try { reserved.commit(); }
             finally { reserved.receipt().ifPresent(receipt -> DamageSettlementTracker.recordShieldReceipt(target, source, receipt)); }

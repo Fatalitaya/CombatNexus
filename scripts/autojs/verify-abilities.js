@@ -43,6 +43,13 @@
   changed(NS.MAINHAND,wand("delayed"));one.setHealth(1);var delayed=execute(req(grants("delayed").get(0)));
   check(String(delayed.status())==="WAITING"&&one.getHealth()===1,"continuation schedules without early healing");
   check(service.cancel(UUID.randomUUID(),actor.getUUID(),delayed.execution()).applied()&&String(service.execution(delayed.execution()).orElseThrow().status())==="CANCELLED","pending continuation cancels explicitly");
+  custom("segments");one.setHealth(1);two.setHealth(1);Probe.reset();
+  var segments=execute(req(grants("segments").get(0),new Target.Entities(List.of(one.getUUID(),two.getUUID()))));
+  check(one.getHealth()===3&&two.getHealth()===3&&segments.commands().size()===4,"two independent segments affect both targets");
+  check(Probe.actions().size()===2&&!Probe.actions().get(0).equals(Probe.actions().get(1)),"same execution creates distinct attack actions");
+  var commands=segments.commands();
+  check(commands.get(0).context().get().action().equals(commands.get(1).context().get().action())&&commands.get(2).context().get().action().equals(commands.get(3).context().get().action())&&!commands.get(0).context().get().action().equals(commands.get(2).context().get().action()),"receipts share action only within each segment");
+  check(Probe.expiredContext(),"segment callback expires with its ability invocation");
   custom("partial");one.setHealth(1);request=req(grants("partial").get(0));var partial=service.execute(request);
   check(!partial.receipt().applied()&&String(partial.execution().orElseThrow().status())==="PARTIAL"&&one.getHealth()===2&&!partial.receipt().journal().applicationCompleted(),"write then throw reports partial application with retained healing");
   service.execute(request);check(one.getHealth()===2,"partial execution is not replayed on repeat request");

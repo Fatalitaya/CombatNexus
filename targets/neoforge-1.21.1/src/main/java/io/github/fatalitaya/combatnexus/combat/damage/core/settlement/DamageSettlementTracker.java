@@ -223,6 +223,11 @@ public final class DamageSettlementTracker {
         if (scope != null && scope.state != null) scope.state.recordProtection(entries);
     }
 
+    public static boolean guard(LivingEntity target, DamageSource source,
+            io.github.fatalitaya.combatnexus.combat.api.behavior.DamageGuardBehavior.Stage stage, float damage, float remaining) {
+        var scope = matchingScope(target, source);
+        return scope != null && scope.state != null && scope.state.guard(stage, damage, remaining);
+    }
     public static float protectHealth(LivingEntity target, DamageSource source, float before, float proposed) {
         var scope = matchingScope(target, source);
         return scope != null && scope.state != null ? scope.state.protectHealth(before, proposed) : proposed;

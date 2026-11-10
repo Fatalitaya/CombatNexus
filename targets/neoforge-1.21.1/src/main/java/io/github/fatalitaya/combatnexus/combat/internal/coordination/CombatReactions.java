@@ -74,7 +74,7 @@ public final class CombatReactions implements CombatReactionService {
         var s=callback.snapshot();
         if(!claimDelivery(callback.context().lineage(),CombatOperation.DAMAGE))return;
         io.github.fatalitaya.combatnexus.combat.spi.CombatBehaviorAccess.recordRecoveryDamage(world,callback);
-        if(s.successfulHit())
+        if(s.causedDamage())
             record(new ReactionFact(s.damageId(),s.target().entity(),id("recovery_delay"),Optional.empty(),"executed",Optional.empty()));
         dispatch(callback.context().lineage(),new SettlementEnvelope(CombatOperation.DAMAGE,identity(callback.context().lineage()),s.target().entity(),Optional.empty(),s.evidence().journal(),s),
             callback.context().evidence().behaviors(),s.evidence().action(),callback::combatAuthority,callback::childAuthority);

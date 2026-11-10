@@ -12,6 +12,9 @@ public interface AbilityExecution {
     void released();
     AbilityInput input();
     CombatAction action();
+    /** Run one independent attack action within this execution; all targets in the callback share it.
+     * The action ends on return or exception. Delayed segments open their own action on resumption. */
+    void attackAction(Runnable attack);
     int step();
     AbilityParameters state();
     CombatSource source();

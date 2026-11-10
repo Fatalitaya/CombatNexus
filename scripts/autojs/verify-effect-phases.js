@@ -66,6 +66,20 @@
             var codec = cls("combat.internal.registration.BehaviorTypes");
             check(codec.decode(codec.encode(new Healing(2, 20, -1, true, Phase.PRESERVE))).phase() === Phase.PRESERVE, "behavior codec round-trips phase policy");
         } finally { sources.close(); }
+        businessTick=now; sources = new Sources(world,function(){return businessTick;});
+        try {
+            var aggregatePort=sources.compose(nativePort),EI=cls("effect.api.EffectInstance"),Display=cls("effect.api.EffectDisplay"),Snapshot=cls("effect.api.EffectSnapshot");
+            var ownerA=Java.loadClass("java.util.UUID").randomUUID(),ownerB=Java.loadClass("java.util.UUID").randomUUID(),sourceB=Id.parse("combatnexus:phase_owner_b");
+            var base=effect(80,Phase.PRESERVE,1),oldAggregate=new EI(base.snapshot(),base.attributes(),base.ownership(),base.behavior(),base.policy(),List.of(),new Display(null,false,false,false,ownerA,true,false,false));
+            write(aggregatePort,null,oldAggregate);businessTick=now+13;
+            var nextBase=effect(120,Phase.PRESERVE,2),nextAggregate=new EI(new Snapshot(cow.getUUID(),id,sourceB,0,nextBase.snapshot().expiresAtTick(),Set.of()),nextBase.attributes(),nextBase.ownership(),nextBase.behavior(),nextBase.policy(),List.of(),new Display(null,false,false,false,ownerB,true,false,false));
+            write(aggregatePort,oldAggregate,nextAggregate);
+            var active=sources.capture(cow.getUUID());
+            check(active.size()===1&&active.get(0).owner().get().equals(ownerB)&&active.get(0).source().equals(sourceB),"aggregate takeover replaces source and attribution once");
+            check(sources.save(cow.getUUID(),Set.of(sourceB),businessTick).get(0).periodicRemaining().get(new Healing(1,20).type())==7,"source takeover preserves seven remaining ticks");
+            cow.setHealth(1);advance(now+19);check(cow.getHealth()===1,"takeover does not advance pending tick");
+            advance(now+20);check(cow.getHealth()===3,"takeover tick uses new payload on old deadline");
+        } finally { sources.close(); }
         return JSON.stringify({passed:checks.length, checks:checks, scope:"real healing and contribution ports with controlled scheduler clock; no vanilla takeover"});
     } finally { cow.discard(); }
 })()

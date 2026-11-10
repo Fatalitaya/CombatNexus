@@ -123,6 +123,16 @@ public final class DefaultShieldService implements ShieldPoolServiceControl {
         state.remove(target, source, reason);
     }
 
+    public double previewRemaining(UUID target, long damageId, NexusId type, double amount, Map<NexusId, Float> channels) {
+        requireStarted();
+        if (!CombatExecutionScope.isCurrentPhase(CombatExecutionScope.Phase.APPLICATION))
+            throw new IllegalStateException("Shield prediction requires application");
+        var lineage = CombatExecutionScope.currentLineage(world.serverSession()).orElseThrow();
+        server.ticket(lineage).bindTarget(world, target);
+        Amounts.nonNegative(amount, "amount");
+        var allocation = state.reserve(target, damageId, type, amount, ShieldPoolState.channels(amount, channels));
+        try { return allocation.remaining; } finally { allocation.release(); }
+    }
     @Override public Reservation reserve(UUID target, long damageId, NexusId damageType, double amount) {
         return reserve(target, damageId, damageType, amount, (CombatParent) null);
     }
@@ -132,7 +142,17 @@ public final class DefaultShieldService implements ShieldPoolServiceControl {
     @Override public Reservation reserve(UUID target, long damageId, NexusId damageType, double amount, Map<NexusId, Float> channels) {
         return reserve(target, damageId, damageType, amount, channels, null);
     }
+    public Reservation reserveAfterReaction(UUID target, long damageId, NexusId type, double amount, Map<NexusId, Float> channels,
+            double maximumAbsorption, Set<NexusId> existingSources) {
+        if (!CombatExecutionScope.isCurrentPhase(CombatExecutionScope.Phase.APPLICATION))
+            throw new IllegalStateException("Reactive shield allocation requires application");
+        return reserve(target, damageId, type, amount, channels, null, maximumAbsorption, Set.copyOf(existingSources));
+    }
     private Reservation reserve(UUID target, long damageId, NexusId damageType, double amount, Map<NexusId, Float> channels, CombatParent parent) {
+        return reserve(target, damageId, damageType, amount, channels, parent, amount, Set.of());
+    }
+    private Reservation reserve(UUID target, long damageId, NexusId damageType, double amount, Map<NexusId, Float> channels, CombatParent parent,
+            double maximumAbsorption, Set<NexusId> existingSources) {
         requireStarted();
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(damageType, "damageType");
@@ -144,7 +164,7 @@ public final class DefaultShieldService implements ShieldPoolServiceControl {
                 : server.requestLineage(CombatOperation.SHIELD, parent);
         if (!CombatExecutionScope.isActive() && !server.admit(lineage).admitted()) throw new IllegalStateException("Shield consumption budget exhausted");
         server.ticket(lineage).bindTarget(world, target);
-        var allocation = state.reserve(target, damageId, damageType, amount, channelRemainder);
+        var allocation = state.reserve(target, damageId, damageType, amount, channelRemainder, maximumAbsorption, existingSources);
         Token token = new Token(target, damageId, lineage, allocation);
         state.remember(allocation);
         tokens.put(new ShieldPoolState.DamageKey(target, damageId), token);
